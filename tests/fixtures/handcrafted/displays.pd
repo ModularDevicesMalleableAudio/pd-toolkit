@@ -1,0 +1,12 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 f 0;
+#X floatatom 50 100 5 0 0 0 - - -;
+#X symbolatom 50 150 10 0 0 0 - - -;
+#X obj 200 50 metro 1000;
+#X obj 200 100 f;
+#X obj 200 150 nbx 5 14 -1e+37 1e+37 0 0 empty empty empty 0 -8 0 10 -262144 -1 -1 0 256;
+#X obj 50 200 print;
+#X connect 0 0 1 0;
+#X connect 0 0 6 0;
+#X connect 3 0 4 0;
+#X connect 4 0 5 0;

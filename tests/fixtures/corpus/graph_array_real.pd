@@ -1,0 +1,6 @@
+#N canvas 62 87 450 250 12;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array swing_pattern 16 float 3;
+#A 0 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1;
+#X coords 0 1 16 0 200 40 1 0 0;
+#X restore 18 16 graph;

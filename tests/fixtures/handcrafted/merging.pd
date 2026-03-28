@@ -1,0 +1,10 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 r source_a;
+#X obj 150 50 r source_b;
+#X obj 250 50 r source_c;
+#X obj 150 100 f;
+#X obj 150 150 print merged;
+#X connect 0 0 3 0;
+#X connect 1 0 3 0;
+#X connect 2 0 3 0;
+#X connect 3 0 4 0;

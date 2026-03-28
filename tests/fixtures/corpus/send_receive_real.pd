@@ -1,0 +1,4 @@
+#N canvas 0 61 450 300 12;
+#X obj 226 226 s midimute_\$1;
+#X obj 226 192 r midimute_\$2;
+#X connect 1 0 0 0;

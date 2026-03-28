@@ -1,0 +1,7 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 r s\$1.\$2_2;
+#X obj 50 100 \$1;
+#X obj 50 150 s s\$1_output;
+#X obj 50 200 arraycopy s\$1_mute_array;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;

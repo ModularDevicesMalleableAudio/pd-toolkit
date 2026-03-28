@@ -1,0 +1,8 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 loadbang;
+#X obj 50 100 used_abs;
+#X obj 50 150 missing_abs;
+#X obj 50 200 print;
+#X connect 0 0 1 0;
+#X connect 1 0 3 0;
+#X connect 2 0 3 0;
