@@ -1,3 +1,4 @@
+pub mod analysis;
 pub mod model;
 pub mod parser;
 pub mod rewrite;

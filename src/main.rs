@@ -97,6 +97,116 @@ fn main() {
                 }
             }
         }
+        Some(Commands::FindOrphans {
+            target,
+            depth,
+            json,
+            delete,
+            in_place,
+            backup,
+            include_comments,
+        }) => match commands::find_orphans::run(
+            &target,
+            depth,
+            json,
+            delete,
+            in_place,
+            backup,
+            include_comments,
+        ) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::FindDisplays {
+            target,
+            depth,
+            json,
+            delete,
+            in_place,
+            backup,
+            include_unconnected,
+            include_labels,
+        }) => match commands::find_displays::run(commands::find_displays::RunArgs {
+            target: &target,
+            depth,
+            json,
+            delete,
+            in_place,
+            backup,
+            include_unconnected,
+            include_labels,
+        }) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Search {
+            target,
+            obj_type,
+            text,
+            depth,
+            json,
+            regex,
+            case_sensitive,
+        }) => match commands::search::run(
+            &target,
+            obj_type.as_deref(),
+            text.as_deref(),
+            depth,
+            json,
+            regex,
+            case_sensitive,
+        ) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Arrays { target, json }) => match commands::arrays::run(&target, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Stats { target, json }) => match commands::stats::run(&target, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
         None => {
             // Print help then exit 0.
             let _ = Cli::parse_from(["pdtk", "--help"]);

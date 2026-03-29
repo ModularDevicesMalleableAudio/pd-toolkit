@@ -1,7 +1,12 @@
+pub mod arrays;
 pub mod common;
 pub mod delete;
+pub mod find_displays;
+pub mod find_orphans;
 pub mod insert;
 pub mod list;
 pub mod parse;
 pub mod renumber;
+pub mod search;
+pub mod stats;
 pub mod validate;

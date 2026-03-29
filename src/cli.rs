@@ -152,4 +152,76 @@ pub enum Commands {
         #[arg(long, value_name = "PATH")]
         output: Option<String>,
     },
+
+    /// Find objects with zero connections
+    FindOrphans {
+        /// File or directory to scan
+        target: String,
+        #[arg(long)]
+        depth: Option<usize>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        delete: bool,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long)]
+        include_comments: bool,
+    },
+
+    /// Find connected display/number widgets
+    FindDisplays {
+        /// File or directory to scan
+        target: String,
+        #[arg(long)]
+        depth: Option<usize>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        delete: bool,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long)]
+        include_unconnected: bool,
+        #[arg(long)]
+        include_labels: bool,
+    },
+
+    /// Search objects by type and/or text
+    Search {
+        /// File or directory to scan
+        target: String,
+        #[arg(long = "type")]
+        obj_type: Option<String>,
+        #[arg(long)]
+        text: Option<String>,
+        #[arg(long)]
+        depth: Option<usize>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        regex: bool,
+        #[arg(long)]
+        case_sensitive: bool,
+    },
+
+    /// List arrays in patches
+    Arrays {
+        /// File or directory to scan
+        target: String,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Patch complexity metrics
+    Stats {
+        /// File or directory to scan
+        target: String,
+        #[arg(long)]
+        json: bool,
+    },
 }
