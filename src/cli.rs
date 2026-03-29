@@ -296,6 +296,42 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Trace message/signal path forward from an object
+    Trace {
+        file: String,
+        #[arg(long)]
+        from: usize,
+        #[arg(long)]
+        to: Option<usize>,
+        #[arg(long, default_value = "0")]
+        depth: usize,
+        #[arg(long)]
+        max_hops: Option<usize>,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Structural diff between two patches
+    Diff {
+        file_a: String,
+        file_b: String,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        ignore_coords: bool,
+    },
+
+    /// List abstraction dependencies
+    Deps {
+        target: String,
+        #[arg(long)]
+        recursive: bool,
+        #[arg(long)]
+        missing: bool,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Rename send/receive pairs atomically
     RenameSend {
         target: String,

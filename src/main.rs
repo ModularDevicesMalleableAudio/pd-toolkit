@@ -261,6 +261,24 @@ fn main() {
                 Err(e) => { eprintln!("{e}"); e.exit_code() }
             }
         }
+        Some(Commands::Trace { file, from, to, depth, max_hops, json }) => {
+            match commands::trace::run(&file, from, to, depth, max_hops, json) {
+                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Diff { file_a, file_b, json, ignore_coords }) => {
+            match commands::diff::run(&file_a, &file_b, json, ignore_coords) {
+                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Deps { target, recursive, missing, json }) => {
+            match commands::deps::run(&target, recursive, missing, json) {
+                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
         Some(Commands::RenameSend { target, from, to, in_place, backup, dry_run, force }) => {
             match commands::rename_send::run(&target, &from, &to, in_place, backup, dry_run, force) {
                 Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
