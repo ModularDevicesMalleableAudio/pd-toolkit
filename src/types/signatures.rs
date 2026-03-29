@@ -49,8 +49,6 @@ pub fn outlet_types(class: &str, args: &[&str]) -> Option<Vec<OutletType>> {
         "f" | "float" | "nb" => Some(vec![OutletType::Float]),
 
         // Int box
-        "i" => Some(vec![OutletType::Float]),
-
         // Symbol box
         "symbol" => Some(vec![OutletType::Symbol]),
 

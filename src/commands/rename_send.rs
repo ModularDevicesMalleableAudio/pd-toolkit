@@ -122,7 +122,6 @@ pub fn rename_in_entry(raw: &str, kind: &EntryKind, from: &str, to: &str) -> Opt
 
 /// Collect all send/receive names currently in use across the entry list.
 fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
-    use pd_toolkit::model::Entry;
     let mut names = std::collections::HashSet::new();
 
     for e in entries {

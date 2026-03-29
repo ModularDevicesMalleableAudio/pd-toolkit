@@ -1,4 +1,4 @@
-use crate::model::{Entry, EntryKind, Patch};
+use crate::model::{Entry, Patch};
 use similar::{capture_diff_slices, Algorithm, DiffOp};
 use std::collections::HashMap;
 

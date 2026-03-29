@@ -67,8 +67,7 @@ pub fn run(
     // Outlet warning: check if existing connections use outlets the new object might not have
     let old_class = entry.class().to_string();
     let old_args: Vec<String> = entry.args();
-    let old_args_refs: Vec<&str> = old_args.iter().map(String::as_str).collect();
-    let _ = old_class; // suppress unused
+    let _ = (old_args, old_class); // used only for outlet-count warning lookup
 
     let new_parts: Vec<&str> = new_text.split_whitespace().collect();
     let new_class = new_parts.first().copied().unwrap_or("");

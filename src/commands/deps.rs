@@ -2,7 +2,7 @@ use pd_toolkit::analysis::deps::{analyse_file, DepEntry};
 use crate::errors::PdtkError;
 use crate::io;
 use std::collections::HashSet;
-use std::path::Path;
+
 
 pub fn run(
     target: &str,
