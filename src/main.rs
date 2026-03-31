@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod errors;
+mod io;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -43,6 +44,52 @@ fn main() {
                         println!("{}", result.output);
                     }
                     result.exit_code
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
+        }
+        Some(Commands::Insert { file, depth, index, entry, in_place, backup, output }) => {
+            match commands::insert::run(
+                &file, depth, index, &entry, in_place, backup, output.as_deref(),
+            ) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
+                    code
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
+        }
+        Some(Commands::Delete { file, depth, index, in_place, backup, output }) => {
+            match commands::delete::run(&file, depth, index, in_place, backup, output.as_deref()) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
+                    code
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
+        }
+        Some(Commands::Renumber { file, depth, from, delta, in_place, backup, output }) => {
+            match commands::renumber::run(
+                &file, depth, from, delta, in_place, backup, output.as_deref(),
+            ) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
+                    code
                 }
                 Err(e) => {
                     eprintln!("{e}");

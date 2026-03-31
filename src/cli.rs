@@ -66,4 +66,90 @@ pub enum Commands {
         #[arg(long, value_name = "PATH")]
         output: Option<String>,
     },
+
+    /// Insert an object at a specific index
+    Insert {
+        /// Path to .pd file
+        file: String,
+
+        /// Subpatch depth for insertion (0 = top-level)
+        #[arg(long)]
+        depth: usize,
+
+        /// Object index where to insert (0-based, before existing object at this index)
+        #[arg(long)]
+        index: usize,
+
+        /// Raw entry text (e.g. "#X obj 50 50 print;")
+        #[arg(long, value_name = "TEXT")]
+        entry: String,
+
+        /// Overwrite the original file
+        #[arg(long)]
+        in_place: bool,
+
+        /// Create a .bak backup before modifying
+        #[arg(long)]
+        backup: bool,
+
+        /// Write output to this file instead of stdout
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// Delete an object at a specific index
+    Delete {
+        /// Path to .pd file
+        file: String,
+
+        /// Subpatch depth of object to delete (0 = top-level)
+        #[arg(long)]
+        depth: usize,
+
+        /// Object index to delete (0-based)
+        #[arg(long)]
+        index: usize,
+
+        /// Overwrite the original file
+        #[arg(long)]
+        in_place: bool,
+
+        /// Create a .bak backup before modifying
+        #[arg(long)]
+        backup: bool,
+
+        /// Write output to this file instead of stdout
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// Shift connection indices at a specific depth
+    Renumber {
+        /// Path to .pd file
+        file: String,
+
+        /// Subpatch depth for renumbering (0 = top-level)
+        #[arg(long)]
+        depth: usize,
+
+        /// Starting index for shift (indices >= this value are shifted)
+        #[arg(long)]
+        from: usize,
+
+        /// Delta to add to indices (can be negative)
+        #[arg(long, allow_hyphen_values = true)]
+        delta: i32,
+
+        /// Overwrite the original file
+        #[arg(long)]
+        in_place: bool,
+
+        /// Create a .bak backup before modifying
+        #[arg(long)]
+        backup: bool,
+
+        /// Write output to this file instead of stdout
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
 }
