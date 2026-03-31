@@ -1,4 +1,6 @@
 pub mod arrays;
+pub mod format;
+pub mod lint;
 pub mod common;
 pub mod connect;
 pub mod connections;

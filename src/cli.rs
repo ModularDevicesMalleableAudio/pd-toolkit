@@ -296,6 +296,39 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Auto-reposition objects (coordinates only, connections untouched)
+    Format {
+        file: String,
+        /// Only reformat the given depth (0 = top-level); omit to reformat all
+        #[arg(long)]
+        depth: Option<usize>,
+        /// Grid snap interval in pixels
+        #[arg(long, default_value = "30")]
+        grid: i32,
+        /// Extra horizontal gap between boxes (pixels)
+        #[arg(long, default_value = "10")]
+        hpad: i32,
+        /// Left/top margin (pixels)
+        #[arg(long, default_value = "20")]
+        margin: i32,
+        /// Print result to stdout without writing any file
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// Combined validate + layout style checks
+    Lint {
+        file: String,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Trace message/signal path forward from an object
     Trace {
         file: String,

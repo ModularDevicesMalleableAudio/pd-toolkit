@@ -260,6 +260,40 @@ fn main() {
                 Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
                 Err(e) => { eprintln!("{e}"); e.exit_code() }
             }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Format { file, depth, grid, hpad, margin, dry_run, in_place, backup, output }) => {
+            match commands::format::run(commands::format::RunArgs {
+                file: &file,
+                depth,
+                grid,
+                hpad,
+                margin,
+                dry_run,
+                in_place,
+                backup,
+                output: output.as_deref(),
+            }) {
+                Ok(out) => {
+                    if dry_run || (!in_place && output.is_none()) {
+                        print!("{out}");
+                    }
+                    0
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Lint { file, json }) => {
+            match commands::lint::run(&file, json) {
+                Ok(result) => {
+                    if !result.output.is_empty() { println!("{}", result.output); }
+                    result.exit_code
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
         }
         Some(Commands::Trace { file, from, to, depth, max_hops, json }) => {
             match commands::trace::run(&file, from, to, depth, max_hops, json) {
