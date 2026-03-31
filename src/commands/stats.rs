@@ -35,9 +35,15 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
     let mut report_rows = Vec::new();
 
     for file in files {
-        let Ok(input) = std::fs::read_to_string(&file) else { continue };
+        let Ok(input) = std::fs::read_to_string(&file) else {
+            continue;
+        };
         let Ok(patch) = parse(&input) else { continue };
-        let objects: Vec<_> = patch.entries.iter().filter(|e| e.object_index.is_some()).collect();
+        let objects: Vec<_> = patch
+            .entries
+            .iter()
+            .filter(|e| e.object_index.is_some())
+            .collect();
         let connections: Vec<_> = patch
             .entries
             .iter()
@@ -65,7 +71,8 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
             let idx = e.object_index.unwrap();
             let d = e.depth.saturating_sub(1);
             let key = (d, idx);
-            let degree = fanin.get(&key).copied().unwrap_or(0) + fanout.get(&key).copied().unwrap_or(0);
+            let degree =
+                fanin.get(&key).copied().unwrap_or(0) + fanout.get(&key).copied().unwrap_or(0);
             if degree == 0 && e.kind != pd_toolkit::model::EntryKind::Text {
                 orphans += 1;
             }

@@ -27,13 +27,17 @@ pub fn run(
     let mut rows = Vec::new();
 
     for file in &files {
-        let Ok(input) = std::fs::read_to_string(file) else { continue };
+        let Ok(input) = std::fs::read_to_string(file) else {
+            continue;
+        };
         let Ok(patch) = parse(&input) else { continue };
 
         for e in &patch.entries {
             let Some(idx) = e.object_index else { continue };
             let user_depth = e.depth.saturating_sub(1);
-            if let Some(d) = depth && d != user_depth {
+            if let Some(d) = depth
+                && d != user_depth
+            {
                 continue;
             }
             if !include_comments && e.kind == EntryKind::Text {

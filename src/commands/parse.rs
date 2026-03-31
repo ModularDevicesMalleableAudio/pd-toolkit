@@ -31,7 +31,11 @@ pub fn run(
     let warnings: Vec<String> = patch.warnings.iter().map(|w| format!("{w:?}")).collect();
 
     let summary = ParseSummary {
-        objects: patch.entries.iter().filter(|e| e.object_index.is_some()).count(),
+        objects: patch
+            .entries
+            .iter()
+            .filter(|e| e.object_index.is_some())
+            .count(),
         connections: patch
             .entries
             .iter()
@@ -69,8 +73,12 @@ pub fn run(
         for e in &patch.entries {
             match e.kind {
                 EntryKind::Connect => conn_count += 1,
-                EntryKind::CanvasOpen | EntryKind::Coords | EntryKind::Array
-                | EntryKind::ArrayData | EntryKind::Declare | EntryKind::WidthHint
+                EntryKind::CanvasOpen
+                | EntryKind::Coords
+                | EntryKind::Array
+                | EntryKind::ArrayData
+                | EntryKind::Declare
+                | EntryKind::WidthHint
                 | EntryKind::Unknown => other_count += 1,
                 _ => {
                     if e.object_index.is_some() {

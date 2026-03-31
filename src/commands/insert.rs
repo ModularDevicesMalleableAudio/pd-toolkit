@@ -2,7 +2,9 @@ use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
 use pd_toolkit::model::{Entry, EntryKind};
-use pd_toolkit::parser::{assign_depth_and_indices, build_entries, classify_entry, tokenize_entries};
+use pd_toolkit::parser::{
+    assign_depth_and_indices, build_entries, classify_entry, tokenize_entries,
+};
 use pd_toolkit::rewrite::serialize;
 
 pub fn run(

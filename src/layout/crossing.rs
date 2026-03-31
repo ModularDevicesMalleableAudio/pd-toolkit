@@ -42,8 +42,11 @@ pub fn reorder(graph: &LayoutGraph, groups: Vec<Vec<usize>>, passes: usize) -> V
                 .iter()
                 .map(|&node| {
                     let preds = graph.predecessors(node);
-                    let positions: Vec<f64> =
-                        preds.iter().filter_map(|p| prev_pos.get(p)).copied().collect();
+                    let positions: Vec<f64> = preds
+                        .iter()
+                        .filter_map(|p| prev_pos.get(p))
+                        .copied()
+                        .collect();
                     let score = if positions.is_empty() {
                         node as f64 // stable fallback
                     } else {
@@ -70,8 +73,11 @@ pub fn reorder(graph: &LayoutGraph, groups: Vec<Vec<usize>>, passes: usize) -> V
                     .iter()
                     .map(|&node| {
                         let succs = graph.successors(node);
-                        let positions: Vec<f64> =
-                            succs.iter().filter_map(|s| next_pos.get(s)).copied().collect();
+                        let positions: Vec<f64> = succs
+                            .iter()
+                            .filter_map(|s| next_pos.get(s))
+                            .copied()
+                            .collect();
                         let score = if positions.is_empty() {
                             node as f64
                         } else {

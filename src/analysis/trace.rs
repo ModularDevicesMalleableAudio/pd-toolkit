@@ -65,7 +65,13 @@ pub fn forward_trace(
         })
         .collect();
 
-    ForwardTrace { mode: "forward", from, to: None, depth, hops }
+    ForwardTrace {
+        mode: "forward",
+        from,
+        to: None,
+        depth,
+        hops,
+    }
 }
 
 pub fn path_trace(
@@ -86,10 +92,21 @@ pub fn path_trace(
                     .object_at(depth, index)
                     .map(|e| e.raw.clone())
                     .unwrap_or_default();
-                PathStep { index, text, via_outlet, via_inlet }
+                PathStep {
+                    index,
+                    text,
+                    via_outlet,
+                    via_inlet,
+                }
             })
             .collect()
     });
 
-    PathTrace { mode: "path", from, to, depth, path }
+    PathTrace {
+        mode: "path",
+        from,
+        to,
+        depth,
+        path,
+    }
 }

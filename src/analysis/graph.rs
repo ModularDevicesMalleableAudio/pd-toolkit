@@ -35,7 +35,12 @@ impl DepthGraph {
             }
         }
 
-        DepthGraph { graph, node_map, idx_map, connections: conns }
+        DepthGraph {
+            graph,
+            node_map,
+            idx_map,
+            connections: conns,
+        }
     }
 
     /// BFS forward from `start_obj`, stopping at `max_hops`.
@@ -75,9 +80,7 @@ impl DepthGraph {
         let mut result: Vec<(usize, usize, usize, usize, usize)> = visited
             .into_iter()
             .filter(|(n, _)| *n != start)
-            .map(|(n, (hops, from, outlet, inlet))| {
-                (self.idx_map[&n], hops, outlet, inlet, from)
-            })
+            .map(|(n, (hops, from, outlet, inlet))| (self.idx_map[&n], hops, outlet, inlet, from))
             .collect();
         result.sort_by_key(|(_, hops, _, _, _)| *hops);
         result

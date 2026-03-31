@@ -31,7 +31,10 @@ fn lint_detects_overlapping_objects() {
     let out = run_pdtk(&["lint", tmp.path().to_str().unwrap()]);
     assert_eq!(out.status.code(), Some(0)); // valid structure, but style warning
     let s = stdout_string(&out);
-    assert!(s.contains("STYLE:"), "overlap should produce a style warning");
+    assert!(
+        s.contains("STYLE:"),
+        "overlap should produce a style warning"
+    );
 }
 
 #[test]

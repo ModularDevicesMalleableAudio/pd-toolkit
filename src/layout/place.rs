@@ -6,9 +6,9 @@ use crate::model::Entry;
 
 // Width estimation
 
-const CHAR_WIDTH: i32 = 7;   // approximate pixels per character
-const PADDING: i32 = 4;      // horizontal padding each side
-const MIN_WIDTH: i32 = 25;   // minimum box width
+const CHAR_WIDTH: i32 = 7; // approximate pixels per character
+const PADDING: i32 = 4; // horizontal padding each side
+const MIN_WIDTH: i32 = 25; // minimum box width
 
 /// Estimate the display width (pixels) of an object box.
 pub fn estimate_width(entry: &Entry) -> i32 {
@@ -69,17 +69,26 @@ fn gui_size_param(class: &str, args: &[String]) -> Option<i32> {
         // tgl/bng: arg[0] is the size in pixels
         "tgl" | "bng" => args.first().and_then(|a| a.parse::<i32>().ok()),
         // nbx: arg[0]=width(chars), arg[1]=height — use width * CHAR_WIDTH
-        "nbx" => args.first().and_then(|a| a.parse::<i32>().ok()).map(|w| w * CHAR_WIDTH),
+        "nbx" => args
+            .first()
+            .and_then(|a| a.parse::<i32>().ok())
+            .map(|w| w * CHAR_WIDTH),
         // vsl/hsl: arg[0]=width, arg[1]=height
         "vsl" => args.get(1).and_then(|a| a.parse::<i32>().ok()),
         "hsl" => args.first().and_then(|a| a.parse::<i32>().ok()),
         // vradio/hradio: arg[0]=size, arg[2]=count — total = size*count
         "vradio" => {
-            let sz = args.first().and_then(|a| a.parse::<i32>().ok()).unwrap_or(15);
+            let sz = args
+                .first()
+                .and_then(|a| a.parse::<i32>().ok())
+                .unwrap_or(15);
             Some(sz)
         }
         "hradio" => {
-            let sz = args.first().and_then(|a| a.parse::<i32>().ok()).unwrap_or(15);
+            let sz = args
+                .first()
+                .and_then(|a| a.parse::<i32>().ok())
+                .unwrap_or(15);
             let count = args.get(2).and_then(|a| a.parse::<i32>().ok()).unwrap_or(8);
             Some(sz * count)
         }
@@ -104,7 +113,12 @@ pub struct LayoutOptions {
 
 impl Default for LayoutOptions {
     fn default() -> Self {
-        LayoutOptions { grid: 30, hpad: 10, vpad: 40, margin: 20 }
+        LayoutOptions {
+            grid: 30,
+            hpad: 10,
+            vpad: 40,
+            margin: 20,
+        }
     }
 }
 
@@ -122,11 +136,7 @@ fn snap(v: i32, grid: i32) -> i32 {
 /// - layout options
 ///
 /// Returns a `Vec<(i32, i32)>` indexed by node id.
-pub fn place_nodes(
-    groups: &[Vec<usize>],
-    widths: &[i32],
-    opts: &LayoutOptions,
-) -> Vec<(i32, i32)> {
+pub fn place_nodes(groups: &[Vec<usize>], widths: &[i32], opts: &LayoutOptions) -> Vec<(i32, i32)> {
     let n = widths.len();
     let mut coords = vec![(opts.margin, opts.margin); n];
 
@@ -161,11 +171,7 @@ pub fn place_nodes(
 
 /// Returns `true` if any two bounding boxes at the same layer overlap
 /// horizontally (they can't overlap vertically because layers are stacked).
-pub fn has_overlaps(
-    groups: &[Vec<usize>],
-    coords: &[(i32, i32)],
-    widths: &[i32],
-) -> bool {
+pub fn has_overlaps(groups: &[Vec<usize>], coords: &[(i32, i32)], widths: &[i32]) -> bool {
     for layer in groups {
         let mut boxes: Vec<(i32, i32)> = layer
             .iter()

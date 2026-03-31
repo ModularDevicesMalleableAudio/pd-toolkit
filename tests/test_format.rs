@@ -99,7 +99,8 @@ fn format_all_corpus_files_connections_preserved() {
         let orig_conns = connections_from(&original);
         let new_conns = connections_from(&out);
         assert_eq!(
-            orig_conns, new_conns,
+            orig_conns,
+            new_conns,
             "connections changed for {}",
             path.display()
         );
@@ -119,7 +120,8 @@ fn format_pd_else_corpus_connections_preserved() {
         let orig_conns = connections_from(&original);
         let new_conns = connections_from(&out);
         assert_eq!(
-            orig_conns, new_conns,
+            orig_conns,
+            new_conns,
             "connections changed for {}",
             path.display()
         );
@@ -146,15 +148,23 @@ fn format_idempotent() {
 
     let tmp1 = tempfile::NamedTempFile::new().unwrap();
     pdtk_output(&[
-        "format", f.to_str().unwrap(), "--grid", "20",
-        "--output", tmp1.path().to_str().unwrap(),
+        "format",
+        f.to_str().unwrap(),
+        "--grid",
+        "20",
+        "--output",
+        tmp1.path().to_str().unwrap(),
     ]);
     let first = std::fs::read_to_string(tmp1.path()).unwrap();
 
     let tmp2 = tempfile::NamedTempFile::new().unwrap();
     pdtk_output(&[
-        "format", tmp1.path().to_str().unwrap(), "--grid", "20",
-        "--output", tmp2.path().to_str().unwrap(),
+        "format",
+        tmp1.path().to_str().unwrap(),
+        "--grid",
+        "20",
+        "--output",
+        tmp2.path().to_str().unwrap(),
     ]);
     let second = std::fs::read_to_string(tmp2.path()).unwrap();
 
@@ -210,7 +220,12 @@ fn format_in_place_backup_creates_bak() {
     std::fs::write(tmp.path(), &src).unwrap();
     let bak = format!("{}.bak", tmp.path().display());
 
-    pdtk_output(&["format", tmp.path().to_str().unwrap(), "--in-place", "--backup"]);
+    pdtk_output(&[
+        "format",
+        tmp.path().to_str().unwrap(),
+        "--in-place",
+        "--backup",
+    ]);
 
     assert!(std::path::Path::new(&bak).exists());
     let bak_content = std::fs::read_to_string(&bak).unwrap();

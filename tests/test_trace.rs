@@ -50,7 +50,14 @@ fn trace_cycle_does_not_infinite_loop() {
 fn trace_max_hops_limits_depth() {
     let f = handcrafted("simple_chain.pd");
     // With max-hops 1, from 0 should only reach index 1, not index 2
-    let out = pdtk_output(&["trace", f.to_str().unwrap(), "--from", "0", "--max-hops", "1"]);
+    let out = pdtk_output(&[
+        "trace",
+        f.to_str().unwrap(),
+        "--from",
+        "0",
+        "--max-hops",
+        "1",
+    ]);
     assert!(out.contains("index:1"));
     assert!(!out.contains("index:2"));
 }

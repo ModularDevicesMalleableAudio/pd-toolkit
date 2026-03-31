@@ -55,7 +55,8 @@ pub fn delete_object(entries: &mut Vec<Entry>, user_depth: usize, index: usize) 
     let internal_depth = user_depth + 1;
     let Some(pos) = entries
         .iter()
-        .position(|e| e.depth == internal_depth && e.object_index == Some(index)) else {
+        .position(|e| e.depth == internal_depth && e.object_index == Some(index))
+    else {
         return false;
     };
 
@@ -66,7 +67,12 @@ pub fn delete_object(entries: &mut Vec<Entry>, user_depth: usize, index: usize) 
         if e.kind != EntryKind::Connect || e.depth != internal_depth {
             return true;
         }
-        let parts: Vec<&str> = e.raw.trim().trim_end_matches(';').split_whitespace().collect();
+        let parts: Vec<&str> = e
+            .raw
+            .trim()
+            .trim_end_matches(';')
+            .split_whitespace()
+            .collect();
         if parts.len() != 6 {
             return true;
         }
@@ -80,7 +86,12 @@ pub fn delete_object(entries: &mut Vec<Entry>, user_depth: usize, index: usize) 
         if e.kind != EntryKind::Connect || e.depth != internal_depth {
             continue;
         }
-        let parts: Vec<&str> = e.raw.trim().trim_end_matches(';').split_whitespace().collect();
+        let parts: Vec<&str> = e
+            .raw
+            .trim()
+            .trim_end_matches(';')
+            .split_whitespace()
+            .collect();
         if parts.len() != 6 || parts[0] != "#X" || parts[1] != "connect" {
             continue;
         }

@@ -24,7 +24,10 @@ fn connections_grouped_by_direction() {
     let out = pdtk_output(&["connections", f.to_str().unwrap(), "--index", "1"]);
     let inlet_pos = out.find("Inlets:").unwrap();
     let outlet_pos = out.find("Outlets:").unwrap();
-    assert!(inlet_pos < outlet_pos, "inlets section must come before outlets section");
+    assert!(
+        inlet_pos < outlet_pos,
+        "inlets section must come before outlets section"
+    );
 }
 
 #[test]

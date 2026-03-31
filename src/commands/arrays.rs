@@ -24,13 +24,20 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
     let mut rows = Vec::new();
 
     for file in files {
-        let Ok(input) = std::fs::read_to_string(&file) else { continue };
+        let Ok(input) = std::fs::read_to_string(&file) else {
+            continue;
+        };
         let Ok(patch) = parse(&input) else { continue };
         for e in &patch.entries {
             if e.kind != EntryKind::Array {
                 continue;
             }
-            let parts: Vec<&str> = e.raw.trim().trim_end_matches(';').split_whitespace().collect();
+            let parts: Vec<&str> = e
+                .raw
+                .trim()
+                .trim_end_matches(';')
+                .split_whitespace()
+                .collect();
             // #X array <name> <size> ...
             if parts.len() < 5 {
                 continue;

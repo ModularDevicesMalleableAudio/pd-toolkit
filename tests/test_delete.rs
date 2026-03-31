@@ -15,8 +15,12 @@ fn delete_object_with_connections_removes_obj_and_conns() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
         "--in-place",
     ]);
 
@@ -40,8 +44,12 @@ fn delete_object_no_connections_removes_only_obj() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
         "--in-place",
     ]);
 
@@ -61,8 +69,12 @@ fn delete_last_object_no_renumbering() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
         "--in-place",
     ]);
 
@@ -85,8 +97,12 @@ fn delete_first_renumbers_remaining() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
         "--in-place",
     ]);
 
@@ -114,8 +130,12 @@ fn delete_only_affects_correct_depth() {
 
     // Delete depth 1, index 0 (the + 1 inside the subpatch)
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "1", "--index", "0",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--index",
+        "0",
         "--in-place",
     ]);
 
@@ -130,8 +150,12 @@ fn delete_only_affects_correct_depth() {
 fn delete_out_of_range_index_exits_2() {
     let f = handcrafted("simple_chain.pd");
     let out = run_pdtk(&[
-        "delete", f.to_str().unwrap(),
-        "--depth", "0", "--index", "100",
+        "delete",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "100",
     ]);
     assert_eq!(out.status.code(), Some(2));
 }
@@ -146,8 +170,12 @@ fn delete_validates_after_mutation() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
     ]);
     assert_eq!(out.status.code(), Some(0));
 }
@@ -158,9 +186,14 @@ fn delete_then_validate_exit_0() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "delete", f.to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--output", tmp.path().to_str().unwrap(),
+        "delete",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
@@ -173,9 +206,14 @@ fn delete_output_flag_writes_to_file() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     let out = run_pdtk(&[
-        "delete", f.to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--output", tmp.path().to_str().unwrap(),
+        "delete",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
     assert_eq!(out.status.code(), Some(0));
 
@@ -197,9 +235,14 @@ fn delete_backup_creates_bak_file() {
     let backup_path = format!("{}.bak", tmp.path().display());
 
     pdtk_output(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--in-place", "--backup",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--in-place",
+        "--backup",
     ]);
 
     assert!(std::path::Path::new(&backup_path).exists());
@@ -222,16 +265,25 @@ fn delete_then_insert_roundtrip() {
 
     // Delete index 1 (bang) — not connected, so connections survive
     pdtk_output(&[
-        "delete", f.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
+        "delete",
+        f.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
         "--in-place",
     ]);
 
     // Re-insert bang at index 1
     pdtk_output(&[
-        "insert", f.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 100 bang;",
+        "insert",
+        f.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 100 bang;",
         "--in-place",
     ]);
 
@@ -248,8 +300,12 @@ fn no_write_if_validation_fails_delete() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&[
-        "delete", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "99",
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "99",
         "--in-place",
     ]);
     assert_ne!(out.status.code(), Some(0));

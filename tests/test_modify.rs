@@ -10,8 +10,15 @@ fn modify_changes_class_and_args() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "modify", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0", "--text", "route 1 2", "--in-place",
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "route 1 2",
+        "--in-place",
     ]);
 
     let result = std::fs::read_to_string(tmp.path()).unwrap();
@@ -27,8 +34,15 @@ fn modify_preserves_coordinates() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "modify", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0", "--text", "+ 1", "--in-place",
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "+ 1",
+        "--in-place",
     ]);
 
     let result = std::fs::read_to_string(tmp.path()).unwrap();
@@ -41,10 +55,16 @@ fn modify_does_not_change_index() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "modify", f.to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--text", "t b b",
-        "--output", tmp.path().to_str().unwrap(),
+        "modify",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--text",
+        "t b b",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let out = pdtk_output(&["list", tmp.path().to_str().unwrap(), "--json"]);
@@ -61,10 +81,16 @@ fn modify_preserves_connections() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "modify", f.to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--text", "t b b",
-        "--output", tmp.path().to_str().unwrap(),
+        "modify",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--text",
+        "t b b",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let result = std::fs::read_to_string(tmp.path()).unwrap();
@@ -87,8 +113,14 @@ fn modify_warns_when_new_obj_has_fewer_outlets() {
 
     // Replace with "bang" which has 1 outlet — outlet 1 (used by conn 0 1 2 0) is out of range
     let out = run_pdtk(&[
-        "modify", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0", "--text", "bang",
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "bang",
     ]);
     // Should still succeed (warning only)
     assert_eq!(out.status.code(), Some(0));
@@ -107,8 +139,14 @@ fn modify_refuses_to_modify_connect_entry() {
 
     // There's no connect entry with an object_index, so this will fail with "no object"
     let out = run_pdtk(&[
-        "modify", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "5", "--text", "bang",
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "5",
+        "--text",
+        "bang",
     ]);
     assert_ne!(out.status.code(), Some(0));
 }
@@ -116,8 +154,14 @@ fn modify_refuses_to_modify_connect_entry() {
 #[test]
 fn modify_refuses_to_modify_canvas_entry() {
     let out = run_pdtk(&[
-        "modify", handcrafted("simple_chain.pd").to_str().unwrap(),
-        "--depth", "99", "--index", "0", "--text", "bang",
+        "modify",
+        handcrafted("simple_chain.pd").to_str().unwrap(),
+        "--depth",
+        "99",
+        "--index",
+        "0",
+        "--text",
+        "bang",
     ]);
     assert_ne!(out.status.code(), Some(0));
 }
@@ -130,9 +174,14 @@ fn modify_special_chars_in_text_handled() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "modify", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--text", r"r s\$1.\$2",
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"r s\$1.\$2",
         "--in-place",
     ]);
 
@@ -146,9 +195,16 @@ fn modify_validates_after_mutation() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "modify", f.to_str().unwrap(),
-        "--depth", "0", "--index", "0", "--text", "loadbang",
-        "--output", tmp.path().to_str().unwrap(),
+        "modify",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "loadbang",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);

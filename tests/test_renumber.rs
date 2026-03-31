@@ -17,8 +17,14 @@ fn renumber_positive_delta_shifts_up() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "renumber", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--from", "1", "--delta", "1",
+        "renumber",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--from",
+        "1",
+        "--delta",
+        "1",
         "--in-place",
     ]);
 
@@ -41,8 +47,14 @@ fn renumber_negative_delta_shifts_down() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "renumber", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--from", "2", "--delta", "-1",
+        "renumber",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--from",
+        "2",
+        "--delta",
+        "-1",
         "--in-place",
     ]);
 
@@ -76,8 +88,14 @@ fn renumber_only_affects_correct_depth() {
 
     // Shift depth 1 from index 2 by -1.  Connection 2→3 becomes 1→2.
     pdtk_output(&[
-        "renumber", tmp.path().to_str().unwrap(),
-        "--depth", "1", "--from", "2", "--delta", "-1",
+        "renumber",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--from",
+        "2",
+        "--delta",
+        "-1",
         "--in-place",
     ]);
 
@@ -106,8 +124,14 @@ fn renumber_creates_invalid_patch_caught_by_validate() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&[
-        "renumber", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--from", "0", "--delta", "100",
+        "renumber",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--from",
+        "0",
+        "--delta",
+        "100",
     ]);
     // Out-of-range indices → validation failure → exit 2
     assert_eq!(out.status.code(), Some(2));
@@ -127,9 +151,16 @@ fn renumber_output_flag_writes_to_file() {
     let tmp_out = tempfile::NamedTempFile::new().unwrap();
 
     let out = run_pdtk(&[
-        "renumber", tmp_in.path().to_str().unwrap(),
-        "--depth", "0", "--from", "2", "--delta", "-1",
-        "--output", tmp_out.path().to_str().unwrap(),
+        "renumber",
+        tmp_in.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--from",
+        "2",
+        "--delta",
+        "-1",
+        "--output",
+        tmp_out.path().to_str().unwrap(),
     ]);
     assert_eq!(out.status.code(), Some(0));
 
@@ -151,9 +182,16 @@ fn renumber_backup_creates_bak_file() {
     let backup_path = format!("{}.bak", tmp.path().display());
 
     pdtk_output(&[
-        "renumber", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--from", "2", "--delta", "-1",
-        "--in-place", "--backup",
+        "renumber",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--from",
+        "2",
+        "--delta",
+        "-1",
+        "--in-place",
+        "--backup",
     ]);
 
     assert!(std::path::Path::new(&backup_path).exists());

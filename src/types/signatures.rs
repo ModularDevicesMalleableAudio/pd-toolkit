@@ -129,9 +129,7 @@ pub fn outlet_types(class: &str, args: &[&str]) -> Option<Vec<OutletType>> {
         "tabwrite~" => Some(vec![]),
         "fft~" | "ifft~" => Some(vec![OutletType::Signal, OutletType::Signal]),
         "*~" | "+~" | "-~" | "/~" => Some(vec![OutletType::Signal]),
-        "hip~" | "lop~" | "bp~" | "vcf~" | "rzero~" | "rpole~" => {
-            Some(vec![OutletType::Signal])
-        }
+        "hip~" | "lop~" | "bp~" | "vcf~" | "rzero~" | "rpole~" => Some(vec![OutletType::Signal]),
         "delwrite~" | "delread~" | "vd~" => Some(vec![OutletType::Signal]),
         "env~" => Some(vec![OutletType::Float]),
 

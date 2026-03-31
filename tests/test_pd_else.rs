@@ -26,11 +26,7 @@ fn pd_else_all_fixtures_parse_without_error() {
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let out = run_pdtk(&["parse", path.to_str().unwrap()]);
-        assert_eq!(
-            out.status.code(),
-            Some(0),
-            "{name} must parse cleanly"
-        );
+        assert_eq!(out.status.code(), Some(0), "{name} must parse cleanly");
     }
 }
 
@@ -64,9 +60,17 @@ fn pd_else_all_fixtures_round_trip_byte_identical() {
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let original = std::fs::read_to_string(&path).unwrap();
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        pdtk_output(&["parse", path.to_str().unwrap(), "--output", tmp.path().to_str().unwrap()]);
+        pdtk_output(&[
+            "parse",
+            path.to_str().unwrap(),
+            "--output",
+            tmp.path().to_str().unwrap(),
+        ]);
         let written = std::fs::read_to_string(tmp.path()).unwrap();
-        assert_eq!(original, written, "{name}: round-trip must be byte-identical");
+        assert_eq!(
+            original, written,
+            "{name}: round-trip must be byte-identical"
+        );
     }
 }
 
@@ -149,7 +153,12 @@ fn glide_connections_intact() {
 
 #[test]
 fn glide_list_depth_1_has_objects() {
-    let out = pdtk_output(&["list", pd_else("glide.pd").to_str().unwrap(), "--depth", "1"]);
+    let out = pdtk_output(&[
+        "list",
+        pd_else("glide.pd").to_str().unwrap(),
+        "--depth",
+        "1",
+    ]);
     assert!(!out.is_empty(), "depth 1 must have objects");
 }
 
@@ -200,7 +209,11 @@ fn crusher_two_subpatches() {
 
 #[test]
 fn arpeggiator_five_subpatches() {
-    let out = pdtk_output(&["parse", pd_else("arpeggiator.pd").to_str().unwrap(), "--json"]);
+    let out = pdtk_output(&[
+        "parse",
+        pd_else("arpeggiator.pd").to_str().unwrap(),
+        "--json",
+    ]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["canvases"], 5);
     assert_eq!(v["max_depth"], 1); // subpatches at depth 1
@@ -208,7 +221,11 @@ fn arpeggiator_five_subpatches() {
 
 #[test]
 fn arpeggiator_object_and_connection_counts() {
-    let out = pdtk_output(&["parse", pd_else("arpeggiator.pd").to_str().unwrap(), "--json"]);
+    let out = pdtk_output(&[
+        "parse",
+        pd_else("arpeggiator.pd").to_str().unwrap(),
+        "--json",
+    ]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["objects"], 110);
     assert_eq!(v["connections"], 136);
@@ -223,7 +240,13 @@ fn arpeggiator_width_hint_not_counted_as_object() {
 
 #[test]
 fn arpeggiator_depth_0_connections_valid() {
-    let out = pdtk_output(&["list", pd_else("arpeggiator.pd").to_str().unwrap(), "--depth", "0", "--json"]);
+    let out = pdtk_output(&[
+        "list",
+        pd_else("arpeggiator.pd").to_str().unwrap(),
+        "--depth",
+        "0",
+        "--json",
+    ]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert!(!v.as_array().unwrap().is_empty());
 }
@@ -246,7 +269,12 @@ fn clock_connection_count_correct() {
 
 #[test]
 fn clock_zero_namespaced_sends_listed() {
-    let out = pdtk_output(&["search", pd_else("clock.pd").to_str().unwrap(), "--type", "s"]);
+    let out = pdtk_output(&[
+        "search",
+        pd_else("clock.pd").to_str().unwrap(),
+        "--type",
+        "s",
+    ]);
     // $0-prefixed sends should appear
     assert!(out.contains("class:s"));
 }
@@ -262,7 +290,12 @@ fn pvoc_five_subpatches() {
 
 #[test]
 fn pvoc_fft_objects_present() {
-    let out = pdtk_output(&["search", pd_else("pvoc~.pd").to_str().unwrap(), "--type", "rfft~"]);
+    let out = pdtk_output(&[
+        "search",
+        pd_else("pvoc~.pd").to_str().unwrap(),
+        "--type",
+        "rfft~",
+    ]);
     assert!(out.contains("class:rfft~"));
 }
 

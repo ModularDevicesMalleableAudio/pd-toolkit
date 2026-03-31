@@ -27,7 +27,11 @@ fn diff_added_object_detected() {
          #X connect 1 0 2 0;\n",
     );
 
-    let out = pdtk_output(&["diff", base.to_str().unwrap(), modified.path().to_str().unwrap()]);
+    let out = pdtk_output(&[
+        "diff",
+        base.to_str().unwrap(),
+        modified.path().to_str().unwrap(),
+    ]);
     assert!(out.contains("Objects added: 1"));
     assert!(out.contains("bang"));
 }
@@ -42,7 +46,11 @@ fn diff_removed_object_detected() {
          #X connect 0 0 1 0;\n",
     );
 
-    let out = pdtk_output(&["diff", base.to_str().unwrap(), modified.path().to_str().unwrap()]);
+    let out = pdtk_output(&[
+        "diff",
+        base.to_str().unwrap(),
+        modified.path().to_str().unwrap(),
+    ]);
     assert!(out.contains("Objects removed: 1"));
 }
 
@@ -58,7 +66,11 @@ fn diff_modified_object_detected() {
          #X connect 1 0 2 0;\n",
     );
 
-    let out = pdtk_output(&["diff", base.to_str().unwrap(), modified.path().to_str().unwrap()]);
+    let out = pdtk_output(&[
+        "diff",
+        base.to_str().unwrap(),
+        modified.path().to_str().unwrap(),
+    ]);
     assert!(out.contains("Objects modified: 1"));
 }
 
@@ -75,7 +87,11 @@ fn diff_added_connection_detected() {
          #X connect 1 0 2 0;\n",
     );
 
-    let out = pdtk_output(&["diff", base.to_str().unwrap(), modified.path().to_str().unwrap()]);
+    let out = pdtk_output(&[
+        "diff",
+        base.to_str().unwrap(),
+        modified.path().to_str().unwrap(),
+    ]);
     assert!(out.contains("Connections added: 1"));
 }
 
@@ -90,7 +106,11 @@ fn diff_removed_connection_detected() {
          #X connect 0 0 1 0;\n",
     );
 
-    let out = pdtk_output(&["diff", base.to_str().unwrap(), modified.path().to_str().unwrap()]);
+    let out = pdtk_output(&[
+        "diff",
+        base.to_str().unwrap(),
+        modified.path().to_str().unwrap(),
+    ]);
     assert!(out.contains("Connections removed: 1"));
 }
 

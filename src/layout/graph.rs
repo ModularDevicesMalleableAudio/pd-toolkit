@@ -23,7 +23,10 @@ impl LayoutGraph {
         let edges = patch
             .connections_at_depth(depth)
             .into_iter()
-            .map(|c| LayoutEdge { src: c.src, dst: c.dst })
+            .map(|c| LayoutEdge {
+                src: c.src,
+                dst: c.dst,
+            })
             .collect();
         LayoutGraph { node_count, edges }
     }

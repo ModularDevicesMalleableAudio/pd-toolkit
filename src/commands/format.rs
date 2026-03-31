@@ -4,7 +4,7 @@ use pd_toolkit::layout::{
     crossing::{group_by_layer, reorder},
     graph::LayoutGraph,
     layer::assign_layers,
-    place::{estimate_width, place_nodes, LayoutOptions},
+    place::{LayoutOptions, estimate_width, place_nodes},
 };
 use pd_toolkit::model::{Entry, EntryKind};
 use pd_toolkit::parser::parse;
@@ -57,7 +57,12 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
         (0..=max_d).collect()
     };
 
-    let opts = LayoutOptions { grid, hpad, vpad: grid + 10, margin };
+    let opts = LayoutOptions {
+        grid,
+        hpad,
+        vpad: grid + 10,
+        margin,
+    };
 
     for d in depths_to_format {
         let internal = d + 1;

@@ -23,7 +23,10 @@ fn extract_to_tmp(fixture: &str, depth: usize) -> (tempfile::NamedTempFile, Stri
 #[test]
 fn extract_output_is_valid_pd_file() {
     let (_tmp, content) = extract_to_tmp("nested_subpatch.pd", 1);
-    assert!(content.trim_start().starts_with("#N canvas"), "must start with canvas header");
+    assert!(
+        content.trim_start().starts_with("#N canvas"),
+        "must start with canvas header"
+    );
 }
 
 #[test]
@@ -33,8 +36,10 @@ fn extract_output_passes_validate() {
     pdtk_output(&[
         "extract",
         f.to_str().unwrap(),
-        "--depth", "1",
-        "--output", tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
     let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(v.status.code(), Some(0));
@@ -52,8 +57,10 @@ fn extract_source_passes_validate_after_in_place() {
     run_pdtk(&[
         "extract",
         src_tmp.path().to_str().unwrap(),
-        "--depth", "1",
-        "--output", out_tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        out_tmp.path().to_str().unwrap(),
         "--in-place",
     ]);
 
@@ -73,18 +80,29 @@ fn extract_in_place_replaces_subpatch_with_abstraction_ref() {
     run_pdtk(&[
         "extract",
         src_tmp.path().to_str().unwrap(),
-        "--depth", "1",
-        "--output", out_path.to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        out_path.to_str().unwrap(),
         "--in-place",
     ]);
 
     let modified = std::fs::read_to_string(src_tmp.path()).unwrap();
     // The subpatch block (#N canvas … #X restore) must be gone
-    assert!(!modified.contains("#X restore"), "restore entry should be replaced");
+    assert!(
+        !modified.contains("#X restore"),
+        "restore entry should be replaced"
+    );
     // An abstraction reference to my_sub should exist
-    assert!(modified.contains("my_sub"), "abstraction reference must appear");
+    assert!(
+        modified.contains("my_sub"),
+        "abstraction reference must appear"
+    );
     // No more nested canvas header
-    let canvas_count = modified.lines().filter(|l| l.starts_with("#N canvas")).count();
+    let canvas_count = modified
+        .lines()
+        .filter(|l| l.starts_with("#N canvas"))
+        .count();
     assert_eq!(canvas_count, 1, "only the root canvas should remain");
 }
 
@@ -95,21 +113,30 @@ fn extract_boundary_connections_become_inlets_outlets() {
     let (_tmp, content) = extract_to_tmp("nested_subpatch.pd", 1);
     // nested_subpatch feeds in from parent (1 inlet) and out to parent (1 outlet)
     assert!(content.contains("inlet"), "extracted file must have inlet");
-    assert!(content.contains("outlet"), "extracted file must have outlet");
+    assert!(
+        content.contains("outlet"),
+        "extracted file must have outlet"
+    );
 }
 
 #[test]
 fn extract_preserves_interior_objects() {
     let (_tmp, content) = extract_to_tmp("nested_subpatch.pd", 1);
     // The subpatch contained + 1
-    assert!(content.contains("+ 1"), "interior object must appear in extracted file");
+    assert!(
+        content.contains("+ 1"),
+        "interior object must appear in extracted file"
+    );
 }
 
 #[test]
 fn extract_preserves_interior_connections() {
     let (_tmp, content) = extract_to_tmp("nested_subpatch.pd", 1);
     // The subpatch had #X connect 0 0 1 0; and #X connect 1 0 2 0; (offset by n_inlets)
-    assert!(content.contains("#X connect"), "interior connections must be preserved");
+    assert!(
+        content.contains("#X connect"),
+        "interior connections must be preserved"
+    );
 }
 
 // Refuses malformed / missing subpatch
@@ -122,8 +149,10 @@ fn extract_refuses_malformed_subpatch() {
     let out = run_pdtk(&[
         "extract",
         f.to_str().unwrap(),
-        "--depth", "1",
-        "--output", tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
     assert_ne!(out.status.code(), Some(0));
 }
@@ -137,8 +166,10 @@ fn extract_works_on_deeply_nested_subpatch() {
     let out = run_pdtk(&[
         "extract",
         f.to_str().unwrap(),
-        "--depth", "1",
-        "--output", tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
     assert_eq!(out.status.code(), Some(0));
 
@@ -159,13 +190,18 @@ fn extract_in_place_backup_creates_bak() {
     run_pdtk(&[
         "extract",
         src_tmp.path().to_str().unwrap(),
-        "--depth", "1",
-        "--output", out_tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        out_tmp.path().to_str().unwrap(),
         "--in-place",
         "--backup",
     ]);
 
-    assert!(std::path::Path::new(&bak_path).exists(), ".bak must be created");
+    assert!(
+        std::path::Path::new(&bak_path).exists(),
+        ".bak must be created"
+    );
     let bak_content = std::fs::read_to_string(&bak_path).unwrap();
     assert_eq!(bak_content, src, ".bak must match original");
     std::fs::remove_file(&bak_path).ok();

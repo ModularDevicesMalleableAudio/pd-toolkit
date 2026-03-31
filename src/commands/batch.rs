@@ -48,7 +48,10 @@ pub fn run(
         let pat = glob::Pattern::new(glob_pattern)
             .map_err(|e| PdtkError::Usage(format!("invalid glob: {e}")))?;
         files.retain(|f| {
-            let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            let name = f
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
             pat.matches(&name)
         });
     }
@@ -62,7 +65,11 @@ pub fn run(
         let file_str = file.display().to_string();
 
         if dry_run {
-            results.push(FileResult { file: file_str.clone(), status: "would_run", error: None });
+            results.push(FileResult {
+                file: file_str.clone(),
+                status: "would_run",
+                error: None,
+            });
             succeeded += 1;
             continue;
         }
@@ -79,7 +86,11 @@ pub fn run(
             .map_err(|e| PdtkError::Usage(format!("failed to spawn pdtk: {e}")))?;
 
         if output.status.success() {
-            results.push(FileResult { file: file_str, status: "ok", error: None });
+            results.push(FileResult {
+                file: file_str,
+                status: "ok",
+                error: None,
+            });
             succeeded += 1;
         } else {
             let err = String::from_utf8_lossy(&output.stderr).to_string();
@@ -127,7 +138,10 @@ pub fn run(
             _ => {}
         }
     }
-    Ok(BatchResult { output: out.trim_end().to_string(), exit_code })
+    Ok(BatchResult {
+        output: out.trim_end().to_string(),
+        exit_code,
+    })
 }
 
 /// Return the path to the currently running pdtk binary.

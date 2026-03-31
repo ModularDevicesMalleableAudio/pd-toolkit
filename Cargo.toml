@@ -38,6 +38,9 @@ similar = "2"
 # Parallel batch processing (optional feature)
 rayon = "1"
 
+# Shell completion generation (runtime subcommand)
+clap_complete = "4"
+
 [dev-dependencies]
 # Snapshot / golden file testing
 insta = { version = "1", features = ["yaml"] }

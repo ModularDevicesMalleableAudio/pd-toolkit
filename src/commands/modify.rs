@@ -1,10 +1,10 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
+use crate::types::signatures::outlet_count;
 use pd_toolkit::model::EntryKind;
 use pd_toolkit::parser::parse;
 use pd_toolkit::rewrite::serialize;
-use crate::types::signatures::outlet_count;
 
 pub fn run(
     file: &str,
@@ -31,35 +31,40 @@ pub fn run(
 
     // Only Obj and Msg can be modified (not canvas, connect, coords, etc.)
     match entry.kind {
-        EntryKind::Obj | EntryKind::Msg | EntryKind::Text | EntryKind::FloatAtom
+        EntryKind::Obj
+        | EntryKind::Msg
+        | EntryKind::Text
+        | EntryKind::FloatAtom
         | EntryKind::SymbolAtom => {}
         EntryKind::Connect => {
             return Err(PdtkError::Usage(
                 "cannot modify a #X connect entry".to_string(),
-            ))
+            ));
         }
         EntryKind::CanvasOpen => {
             return Err(PdtkError::Usage(
                 "cannot modify a #N canvas entry".to_string(),
-            ))
+            ));
         }
         EntryKind::Coords => {
             return Err(PdtkError::Usage(
                 "cannot modify a #X coords entry".to_string(),
-            ))
+            ));
         }
         _ => {
             return Err(PdtkError::Usage(format!(
                 "cannot modify entry of kind {:?}",
                 entry.kind
-            )))
+            )));
         }
     }
 
     // Extract X Y coordinates from the current raw entry
     let parts: Vec<&str> = entry.raw.split_whitespace().collect();
     if parts.len() < 4 {
-        return Err(PdtkError::Usage("entry too short to extract coordinates".to_string()));
+        return Err(PdtkError::Usage(
+            "entry too short to extract coordinates".to_string(),
+        ));
     }
     let x = parts[2];
     let y = parts[3];

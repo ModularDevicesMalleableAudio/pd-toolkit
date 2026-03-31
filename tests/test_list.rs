@@ -97,11 +97,12 @@ fn list_corpus_width_hint_real_indices() {
     assert!(out.status.success());
     let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
     // ensure no width hint pseudo-object slipped in
-    assert!(json
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|o| o["class"] != "width_hint"));
+    assert!(
+        json.as_array()
+            .unwrap()
+            .iter()
+            .all(|o| o["class"] != "width_hint")
+    );
 }
 
 #[test]
@@ -109,9 +110,17 @@ fn list_output_flag_writes_to_file() {
     let f = handcrafted("simple_chain.pd");
     let tmp = tempfile::NamedTempFile::new().unwrap();
     // With --output, nothing should go to stdout
-    let out = run_pdtk(&["list", f.to_str().unwrap(), "--output", tmp.path().to_str().unwrap()]);
+    let out = run_pdtk(&[
+        "list",
+        f.to_str().unwrap(),
+        "--output",
+        tmp.path().to_str().unwrap(),
+    ]);
     assert!(out.status.success());
-    assert!(stdout_string(&out).trim().is_empty(), "stdout must be empty when --output is used");
+    assert!(
+        stdout_string(&out).trim().is_empty(),
+        "stdout must be empty when --output is used"
+    );
     let content = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(content.contains("[0:0] loadbang"));
 }
@@ -120,7 +129,13 @@ fn list_output_flag_writes_to_file() {
 fn list_output_flag_json_writes_to_file() {
     let f = handcrafted("simple_chain.pd");
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    pdtk_output(&["list", f.to_str().unwrap(), "--json", "--output", tmp.path().to_str().unwrap()]);
+    pdtk_output(&[
+        "list",
+        f.to_str().unwrap(),
+        "--json",
+        "--output",
+        tmp.path().to_str().unwrap(),
+    ]);
     let content = std::fs::read_to_string(tmp.path()).unwrap();
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     assert!(json.is_array());

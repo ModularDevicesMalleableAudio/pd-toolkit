@@ -91,9 +91,16 @@ fn validate_strict_duplicate_is_warning_not_error() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap(), "--strict"]);
-    assert_eq!(out.status.code(), Some(0), "duplicate connections are warnings, not errors");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "duplicate connections are warnings, not errors"
+    );
     let stdout = stdout_string(&out);
-    assert!(stdout.contains("duplicate connection"), "warning text must appear");
+    assert!(
+        stdout.contains("duplicate connection"),
+        "warning text must appear"
+    );
     assert!(stdout.contains("OK: patch is valid"), "patch still valid");
 }
 
@@ -103,13 +110,22 @@ fn validate_strict_duplicate_json_is_in_warnings_array() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp.path(), input).unwrap();
 
-    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap(), "--strict", "--json"]);
+    let out = run_pdtk(&[
+        "validate",
+        tmp.path().to_str().unwrap(),
+        "--strict",
+        "--json",
+    ]);
     assert_eq!(out.status.code(), Some(0));
     let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
     assert_eq!(json["valid"], true);
     assert!(json["errors"].as_array().unwrap().is_empty());
     let warnings = json["warnings"].as_array().unwrap();
-    assert!(warnings.iter().any(|w| w.as_str().unwrap_or("").contains("duplicate connection")));
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap_or("").contains("duplicate connection"))
+    );
 }
 
 #[test]
@@ -139,9 +155,17 @@ fn validate_nonexistent_file_exits_3() {
 fn validate_output_flag_writes_to_file() {
     let f = handcrafted("simple_chain.pd");
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let out = run_pdtk(&["validate", f.to_str().unwrap(), "--output", tmp.path().to_str().unwrap()]);
+    let out = run_pdtk(&[
+        "validate",
+        f.to_str().unwrap(),
+        "--output",
+        tmp.path().to_str().unwrap(),
+    ]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(stdout_string(&out).trim().is_empty(), "stdout must be empty when --output is used");
+    assert!(
+        stdout_string(&out).trim().is_empty(),
+        "stdout must be empty when --output is used"
+    );
     let content = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(content.contains("OK: patch is valid"));
 }

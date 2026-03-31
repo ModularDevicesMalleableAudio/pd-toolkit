@@ -53,12 +53,18 @@ pub fn run(
     let mut rows = Vec::new();
 
     for file in files {
-        let Ok(input) = std::fs::read_to_string(&file) else { continue };
+        let Ok(input) = std::fs::read_to_string(&file) else {
+            continue;
+        };
         let Ok(patch) = parse(&input) else { continue };
         for e in &patch.entries {
-            let Some(index) = e.object_index else { continue };
+            let Some(index) = e.object_index else {
+                continue;
+            };
             let d = e.depth.saturating_sub(1);
-            if let Some(wanted) = depth && wanted != d {
+            if let Some(wanted) = depth
+                && wanted != d
+            {
                 continue;
             }
 
@@ -128,7 +134,12 @@ pub fn run(
 
     Ok(rows
         .into_iter()
-        .map(|r| format!("{} [depth:{} index:{} class:{}] {}", r.file, r.depth, r.index, r.class, r.text))
+        .map(|r| {
+            format!(
+                "{} [depth:{} index:{} class:{}] {}",
+                r.file, r.depth, r.index, r.class, r.text
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n"))
 }

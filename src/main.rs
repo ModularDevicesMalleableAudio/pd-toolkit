@@ -24,37 +24,57 @@ fn main() {
                 }
             }
         }
-        Some(Commands::List { file, depth, json, output }) => {
-            match commands::list::run(&file, depth, json, output.as_deref()) {
-                Ok(out) => {
-                    if !out.is_empty() {
-                        println!("{out}");
-                    }
-                    0
+        Some(Commands::List {
+            file,
+            depth,
+            json,
+            output,
+        }) => match commands::list::run(&file, depth, json, output.as_deref()) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
                 }
-                Err(e) => {
-                    eprintln!("{e}");
-                    e.exit_code()
-                }
+                0
             }
-        }
-        Some(Commands::Validate { file, strict, json, output }) => {
-            match commands::validate::run(&file, strict, json, output.as_deref()) {
-                Ok(result) => {
-                    if !result.output.is_empty() {
-                        println!("{}", result.output);
-                    }
-                    result.exit_code
-                }
-                Err(e) => {
-                    eprintln!("{e}");
-                    e.exit_code()
-                }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
             }
-        }
-        Some(Commands::Insert { file, depth, index, entry, in_place, backup, output }) => {
+        },
+        Some(Commands::Validate {
+            file,
+            strict,
+            json,
+            output,
+        }) => match commands::validate::run(&file, strict, json, output.as_deref()) {
+            Ok(result) => {
+                if !result.output.is_empty() {
+                    println!("{}", result.output);
+                }
+                result.exit_code
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Insert {
+            file,
+            depth,
+            index,
+            entry,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::insert::run(
-                &file, depth, index, &entry, in_place, backup, output.as_deref(),
+                &file,
+                depth,
+                index,
+                &entry,
+                in_place,
+                backup,
+                output.as_deref(),
             ) {
                 Ok((serialized, code)) => {
                     if !in_place && output.is_none() {
@@ -68,7 +88,14 @@ fn main() {
                 }
             }
         }
-        Some(Commands::Delete { file, depth, index, in_place, backup, output }) => {
+        Some(Commands::Delete {
+            file,
+            depth,
+            index,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::delete::run(&file, depth, index, in_place, backup, output.as_deref()) {
                 Ok((serialized, code)) => {
                     if !in_place && output.is_none() {
@@ -82,9 +109,23 @@ fn main() {
                 }
             }
         }
-        Some(Commands::Renumber { file, depth, from, delta, in_place, backup, output }) => {
+        Some(Commands::Renumber {
+            file,
+            depth,
+            from,
+            delta,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::renumber::run(
-                &file, depth, from, delta, in_place, backup, output.as_deref(),
+                &file,
+                depth,
+                from,
+                delta,
+                in_place,
+                backup,
+                output.as_deref(),
             ) {
                 Ok((serialized, code)) => {
                     if !in_place && output.is_none() {
@@ -208,16 +249,47 @@ fn main() {
                 e.exit_code()
             }
         },
-        Some(Commands::Modify { file, depth, index, text, in_place, backup, output }) => {
-            match commands::modify::run(&file, depth, index, &text, in_place, backup, output.as_deref()) {
+        Some(Commands::Modify {
+            file,
+            depth,
+            index,
+            text,
+            in_place,
+            backup,
+            output,
+        }) => {
+            match commands::modify::run(
+                &file,
+                depth,
+                index,
+                &text,
+                in_place,
+                backup,
+                output.as_deref(),
+            ) {
                 Ok((serialized, code)) => {
-                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
                     code
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
         }
-        Some(Commands::Connect { file, depth, src, outlet, dst, inlet, in_place, backup, output }) => {
+        Some(Commands::Connect {
+            file,
+            depth,
+            src,
+            outlet,
+            dst,
+            inlet,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::connect::run(commands::connect::RunArgs {
                 file: &file,
                 depth,
@@ -230,13 +302,28 @@ fn main() {
                 output: output.as_deref(),
             }) {
                 Ok((serialized, code)) => {
-                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
                     code
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
         }
-        Some(Commands::Disconnect { file, depth, src, outlet, dst, inlet, in_place, backup, output }) => {
+        Some(Commands::Disconnect {
+            file,
+            depth,
+            src,
+            outlet,
+            dst,
+            inlet,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::disconnect::run(commands::disconnect::RunArgs {
                 file: &file,
                 depth,
@@ -249,23 +336,45 @@ fn main() {
                 output: output.as_deref(),
             }) {
                 Ok((serialized, code)) => {
-                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
                     code
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
         }
-        Some(Commands::Connections { file, index, depth, json }) => {
-            match commands::connections::run(&file, index, depth, json) {
-                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+        Some(Commands::Connections {
+            file,
+            index,
+            depth,
+            json,
+        }) => match commands::connections::run(&file, index, depth, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
             }
             Err(e) => {
                 eprintln!("{e}");
                 e.exit_code()
             }
         },
-        Some(Commands::Format { file, depth, grid, hpad, margin, dry_run, in_place, backup, output }) => {
+        Some(Commands::Format {
+            file,
+            depth,
+            grid,
+            hpad,
+            margin,
+            dry_run,
+            in_place,
+            backup,
+            output,
+        }) => {
             match commands::format::run(commands::format::RunArgs {
                 file: &file,
                 depth,
@@ -283,57 +392,141 @@ fn main() {
                     }
                     0
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
-            }
-        }
-        Some(Commands::Lint { file, json }) => {
-            match commands::lint::run(&file, json) {
-                Ok(result) => {
-                    if !result.output.is_empty() { println!("{}", result.output); }
-                    result.exit_code
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
             }
         }
-        Some(Commands::Extract { file, depth, output, in_place, backup }) => {
-            match commands::extract::run(&file, depth, &output, in_place, backup) {
-                Ok(()) => 0,
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+        Some(Commands::Lint { file, json }) => match commands::lint::run(&file, json) {
+            Ok(result) => {
+                if !result.output.is_empty() {
+                    println!("{}", result.output);
+                }
+                result.exit_code
             }
-        }
-        Some(Commands::Batch { dir, command, glob, dry_run, continue_on_error, json }) => {
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Extract {
+            file,
+            depth,
+            output,
+            in_place,
+            backup,
+        }) => match commands::extract::run(&file, depth, &output, in_place, backup) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Batch {
+            dir,
+            command,
+            glob,
+            dry_run,
+            continue_on_error,
+            json,
+        }) => {
             let cmd_refs: Vec<&str> = command.iter().map(String::as_str).collect();
             match commands::batch::run(&dir, &cmd_refs, &glob, dry_run, continue_on_error, json) {
                 Ok(result) => {
-                    if !result.output.is_empty() { println!("{}", result.output); }
+                    if !result.output.is_empty() {
+                        println!("{}", result.output);
+                    }
                     result.exit_code
                 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
         }
-        Some(Commands::Trace { file, from, to, depth, max_hops, json }) => {
-            match commands::trace::run(&file, from, to, depth, max_hops, json) {
-                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
+        Some(Commands::Trace {
+            file,
+            from,
+            to,
+            depth,
+            max_hops,
+            json,
+        }) => match commands::trace::run(&file, from, to, depth, max_hops, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Diff {
+            file_a,
+            file_b,
+            json,
+            ignore_coords,
+        }) => match commands::diff::run(&file_a, &file_b, json, ignore_coords) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::Deps {
+            target,
+            recursive,
+            missing,
+            json,
+        }) => match commands::deps::run(&target, recursive, missing, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
+        Some(Commands::RenameSend {
+            target,
+            from,
+            to,
+            in_place,
+            backup,
+            dry_run,
+            force,
+        }) => {
+            match commands::rename_send::run(&target, &from, &to, in_place, backup, dry_run, force)
+            {
+                Ok(out) => {
+                    if !out.is_empty() {
+                        println!("{out}");
+                    }
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
         }
-        Some(Commands::Diff { file_a, file_b, json, ignore_coords }) => {
-            match commands::diff::run(&file_a, &file_b, json, ignore_coords) {
-                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
-            }
-        }
-        Some(Commands::Deps { target, recursive, missing, json }) => {
-            match commands::deps::run(&target, recursive, missing, json) {
-                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
-            }
-        }
-        Some(Commands::RenameSend { target, from, to, in_place, backup, dry_run, force }) => {
-            match commands::rename_send::run(&target, &from, &to, in_place, backup, dry_run, force) {
-                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
-                Err(e) => { eprintln!("{e}"); e.exit_code() }
-            }
+        Some(Commands::Completions { shell }) => {
+            use clap::CommandFactory;
+            use clap_complete::generate;
+            let mut cmd = Cli::command();
+            generate(shell, &mut cmd, "pdtk", &mut std::io::stdout());
+            0
         }
         None => {
             // Print help then exit 0.

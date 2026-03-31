@@ -12,9 +12,14 @@ fn insert_at_beginning_renumbers_all_connections() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--entry", "#X obj 50 25 loadbang;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--entry",
+        "#X obj 50 25 loadbang;",
         "--in-place",
     ]);
 
@@ -35,9 +40,14 @@ fn insert_at_end_no_renumbering() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "2",
-        "--entry", "#X obj 50 150 bang;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "2",
+        "--entry",
+        "#X obj 50 150 bang;",
         "--in-place",
     ]);
 
@@ -59,9 +69,14 @@ fn insert_in_middle_renumbers_only_affected() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 75 t f f;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 t f f;",
         "--in-place",
     ]);
 
@@ -88,9 +103,14 @@ fn insert_into_subpatch_only_affects_that_depth() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "1", "--index", "1",
-        "--entry", "#X obj 50 75 + 1;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 + 1;",
         "--in-place",
     ]);
 
@@ -100,7 +120,8 @@ fn insert_into_subpatch_only_affects_that_depth() {
     // Depth 0 connections should be unchanged: 0→1, 1→2
     // (counted from depth 0 end of file)
     let lines: Vec<&str> = result.lines().collect();
-    let depth0_conns: Vec<&&str> = lines.iter()
+    let depth0_conns: Vec<&&str> = lines
+        .iter()
         .filter(|l| l.starts_with("#X connect"))
         .collect();
     // Should have 3 connections total: 1 at depth 1 (0→2), 2 at depth 0 (0→1, 1→2)
@@ -116,9 +137,14 @@ fn insert_inserted_object_correct_position() {
     std::fs::write(tmp.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 75 + 1;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 + 1;",
         "--in-place",
     ]);
 
@@ -134,9 +160,14 @@ fn insert_inserted_object_correct_position() {
 fn insert_out_of_range_index_exits_2() {
     let f = handcrafted("simple_chain.pd");
     let out = run_pdtk(&[
-        "insert", f.to_str().unwrap(),
-        "--depth", "0", "--index", "10",
-        "--entry", "#X obj 50 50 f;",
+        "insert",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "10",
+        "--entry",
+        "#X obj 50 50 f;",
     ]);
     assert_eq!(out.status.code(), Some(2));
 }
@@ -150,9 +181,14 @@ fn insert_validates_after_mutation() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 75 bang;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 bang;",
     ]);
     assert_eq!(out.status.code(), Some(0));
 }
@@ -163,10 +199,16 @@ fn insert_then_validate_exit_0() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "insert", f.to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 75 bang;",
-        "--output", tmp.path().to_str().unwrap(),
+        "insert",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 bang;",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
@@ -179,10 +221,16 @@ fn insert_output_flag_writes_to_file() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
 
     pdtk_output(&[
-        "insert", f.to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--entry", "#X obj 50 25 bang;",
-        "--output", tmp.path().to_str().unwrap(),
+        "insert",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--entry",
+        "#X obj 50 25 bang;",
+        "--output",
+        tmp.path().to_str().unwrap(),
     ]);
 
     let result = std::fs::read_to_string(tmp.path()).unwrap();
@@ -200,10 +248,16 @@ fn insert_backup_creates_bak_file() {
     let backup_path = format!("{}.bak", tmp.path().display());
 
     pdtk_output(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "0",
-        "--entry", "#X obj 50 25 loadbang;",
-        "--in-place", "--backup",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--entry",
+        "#X obj 50 25 loadbang;",
+        "--in-place",
+        "--backup",
     ]);
 
     assert!(std::path::Path::new(&backup_path).exists());
@@ -224,15 +278,24 @@ fn insert_then_delete_roundtrip() {
     std::fs::write(f.path(), input).unwrap();
 
     pdtk_output(&[
-        "insert", f.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
-        "--entry", "#X obj 50 75 bang;",
+        "insert",
+        f.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--entry",
+        "#X obj 50 75 bang;",
         "--in-place",
     ]);
 
     pdtk_output(&[
-        "delete", f.path().to_str().unwrap(),
-        "--depth", "0", "--index", "1",
+        "delete",
+        f.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
         "--in-place",
     ]);
 
@@ -252,9 +315,14 @@ fn no_write_if_validation_fails_insert() {
     std::fs::write(tmp.path(), input).unwrap();
 
     let out = run_pdtk(&[
-        "insert", tmp.path().to_str().unwrap(),
-        "--depth", "0", "--index", "99",
-        "--entry", "#X obj 50 50 bang;",
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "99",
+        "--entry",
+        "#X obj 50 50 bang;",
         "--in-place",
     ]);
     assert_ne!(out.status.code(), Some(0));

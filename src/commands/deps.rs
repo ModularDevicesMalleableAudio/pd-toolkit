@@ -1,8 +1,7 @@
-use pd_toolkit::analysis::deps::{analyse_file, DepEntry};
 use crate::errors::PdtkError;
 use crate::io;
+use pd_toolkit::analysis::deps::{DepEntry, analyse_file};
 use std::collections::HashSet;
-
 
 pub fn run(
     target: &str,

@@ -51,7 +51,10 @@ mod tests {
     fn graph_from_edges(n: usize, edges: &[(usize, usize)]) -> LayoutGraph {
         LayoutGraph {
             node_count: n,
-            edges: edges.iter().map(|&(s, d)| LayoutEdge { src: s, dst: d }).collect(),
+            edges: edges
+                .iter()
+                .map(|&(s, d)| LayoutEdge { src: s, dst: d })
+                .collect(),
         }
     }
 

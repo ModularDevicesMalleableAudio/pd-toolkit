@@ -23,9 +23,7 @@ pub fn run(
     let _delete_pos = entries
         .iter()
         .position(|e| e.depth == internal_depth && e.object_index == Some(index))
-        .ok_or_else(|| {
-            PdtkError::Usage(format!("no object at depth {depth}, index {index}"))
-        })?;
+        .ok_or_else(|| PdtkError::Usage(format!("no object at depth {depth}, index {index}")))?;
 
     // Remove the entry
     entries.remove(_delete_pos);

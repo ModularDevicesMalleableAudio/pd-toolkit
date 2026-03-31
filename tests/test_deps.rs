@@ -50,23 +50,37 @@ fn deps_circular_reference_no_infinite_loop() {
     std::fs::write(
         dir.path().join("a.pd"),
         "#N canvas 0 22 450 300 12;\n#X obj 50 50 b;\n",
-    ).unwrap();
+    )
+    .unwrap();
     std::fs::write(
         dir.path().join("b.pd"),
         "#N canvas 0 22 450 300 12;\n#X obj 50 50 a;\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     let a = dir.path().join("a.pd");
     let out = run_pdtk(&["deps", a.to_str().unwrap(), "--recursive"]);
-    assert_eq!(out.status.code(), Some(0), "circular deps must not infinite loop");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "circular deps must not infinite loop"
+    );
 }
 
 #[test]
 fn deps_directory_mode_deduplicates() {
     let dir = tempfile::tempdir().unwrap();
     // Two files each using the same abstraction
-    std::fs::write(dir.path().join("x.pd"), "#N canvas 0 22 450 300 12;\n#X obj 50 50 myabs;\n").unwrap();
-    std::fs::write(dir.path().join("y.pd"), "#N canvas 0 22 450 300 12;\n#X obj 50 50 myabs;\n").unwrap();
+    std::fs::write(
+        dir.path().join("x.pd"),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 myabs;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("y.pd"),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 myabs;\n",
+    )
+    .unwrap();
 
     let out = pdtk_output(&["deps", dir.path().to_str().unwrap()]);
     // "myabs" should appear at most once per file — check it shows in both

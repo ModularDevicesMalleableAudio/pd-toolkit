@@ -58,9 +58,10 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
     }
 
     // Refuse duplicate connections
-    let already_exists = patch.connections_at_depth(depth).iter().any(|c| {
-        c.src == src && c.src_outlet == outlet && c.dst == dst && c.dst_inlet == inlet
-    });
+    let already_exists = patch
+        .connections_at_depth(depth)
+        .iter()
+        .any(|c| c.src == src && c.src_outlet == outlet && c.dst == dst && c.dst_inlet == inlet);
     if already_exists {
         return Err(PdtkError::Usage(format!(
             "connection {src} {outlet} {dst} {inlet} already exists at depth {depth}"

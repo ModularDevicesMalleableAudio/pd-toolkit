@@ -25,12 +25,8 @@ pub fn run(
     let canvas_pos = entries[1..]
         .iter()
         .position(|e| e.kind == EntryKind::CanvasOpen && e.depth == sub_canvas_internal_depth)
-        .map(|p| p + 1)   // adjust back to full-slice index
-        .ok_or_else(|| {
-            PdtkError::Usage(format!(
-                "no subpatch found at depth {user_depth}"
-            ))
-        })?;
+        .map(|p| p + 1) // adjust back to full-slice index
+        .ok_or_else(|| PdtkError::Usage(format!("no subpatch found at depth {user_depth}")))?;
 
     // The matching Restore closes this subpatch.
     let restore_pos = entries[canvas_pos + 1..]
@@ -43,9 +39,9 @@ pub fn run(
             ))
         })?;
 
-    let restore_obj_index = entries[restore_pos].object_index.ok_or_else(|| {
-        PdtkError::Usage("restore entry has no object index".to_string())
-    })?;
+    let restore_obj_index = entries[restore_pos]
+        .object_index
+        .ok_or_else(|| PdtkError::Usage("restore entry has no object index".to_string()))?;
 
     // -----------------------------------------------------------------------
     // Boundary connection analysis: which parent connections reference the

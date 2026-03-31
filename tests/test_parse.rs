@@ -80,9 +80,17 @@ fn parse_output_flag_round_trips_file() {
     let f = handcrafted("simple_chain.pd");
     let original = std::fs::read_to_string(&f).unwrap();
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let _summary = pdtk_output(&["parse", f.to_str().unwrap(), "--output", tmp.path().to_str().unwrap()]);
+    let _summary = pdtk_output(&[
+        "parse",
+        f.to_str().unwrap(),
+        "--output",
+        tmp.path().to_str().unwrap(),
+    ]);
     let written = std::fs::read_to_string(tmp.path()).unwrap();
-    assert_eq!(original, written, "--output must produce byte-identical round-trip");
+    assert_eq!(
+        original, written,
+        "--output must produce byte-identical round-trip"
+    );
 }
 
 #[test]
@@ -96,7 +104,12 @@ fn parse_output_flag_round_trips_corpus_files() {
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let original = std::fs::read_to_string(&path).unwrap();
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        pdtk_output(&["parse", path.to_str().unwrap(), "--output", tmp.path().to_str().unwrap()]);
+        pdtk_output(&[
+            "parse",
+            path.to_str().unwrap(),
+            "--output",
+            tmp.path().to_str().unwrap(),
+        ]);
         let written = std::fs::read_to_string(tmp.path()).unwrap();
         assert_eq!(original, written, "round-trip failed for {name}");
     }
@@ -114,7 +127,11 @@ fn parse_verbose_flag_accepted() {
 #[test]
 fn parse_malformed_missing_semicolon_emits_warning() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(tmp.path(), "#N canvas 0 22 450 300 12;\n#X obj 50 50 loadbang\n").unwrap();
+    std::fs::write(
+        tmp.path(),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 loadbang\n",
+    )
+    .unwrap();
 
     let out = run_pdtk(&["parse", tmp.path().to_str().unwrap()]);
     assert!(out.status.success());

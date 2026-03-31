@@ -1,6 +1,6 @@
-use pd_toolkit::analysis::diff::diff_patches;
 use crate::errors::PdtkError;
 use crate::io;
+use pd_toolkit::analysis::diff::diff_patches;
 use pd_toolkit::parser::parse;
 
 pub fn run(
@@ -27,19 +27,31 @@ pub fn run(
     let mut out = String::new();
 
     if !result.objects_removed.is_empty() {
-        out.push_str(&format!("Objects removed: {}\n", result.objects_removed.len()));
+        out.push_str(&format!(
+            "Objects removed: {}\n",
+            result.objects_removed.len()
+        ));
         for c in &result.objects_removed {
-            out.push_str(&format!("  - [depth:{} index:{}] {}\n", c.depth, c.index, c.text));
+            out.push_str(&format!(
+                "  - [depth:{} index:{}] {}\n",
+                c.depth, c.index, c.text
+            ));
         }
     }
     if !result.objects_added.is_empty() {
         out.push_str(&format!("Objects added: {}\n", result.objects_added.len()));
         for c in &result.objects_added {
-            out.push_str(&format!("  + [depth:{} index:{}] {}\n", c.depth, c.index, c.text));
+            out.push_str(&format!(
+                "  + [depth:{} index:{}] {}\n",
+                c.depth, c.index, c.text
+            ));
         }
     }
     if !result.objects_modified.is_empty() {
-        out.push_str(&format!("Objects modified: {}\n", result.objects_modified.len()));
+        out.push_str(&format!(
+            "Objects modified: {}\n",
+            result.objects_modified.len()
+        ));
         for c in &result.objects_modified {
             out.push_str(&format!(
                 "  ~ [depth:{} index:{}]\n    - {}\n    + {}\n",
@@ -51,7 +63,10 @@ pub fn run(
         }
     }
     if !result.connections_removed.is_empty() {
-        out.push_str(&format!("Connections removed: {}\n", result.connections_removed.len()));
+        out.push_str(&format!(
+            "Connections removed: {}\n",
+            result.connections_removed.len()
+        ));
         for c in &result.connections_removed {
             out.push_str(&format!(
                 "  - [depth:{}] {} {} → {} {}\n",
@@ -60,7 +75,10 @@ pub fn run(
         }
     }
     if !result.connections_added.is_empty() {
-        out.push_str(&format!("Connections added: {}\n", result.connections_added.len()));
+        out.push_str(&format!(
+            "Connections added: {}\n",
+            result.connections_added.len()
+        ));
         for c in &result.connections_added {
             out.push_str(&format!(
                 "  + [depth:{}] {} {} → {} {}\n",

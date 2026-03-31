@@ -1,6 +1,6 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::{gui_send_receive_arg_indices, vu_receive_arg_index, Entry, EntryKind};
+use pd_toolkit::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
 use pd_toolkit::parser::{build_entries, tokenize_entries};
 use pd_toolkit::rewrite::serialize;
 
@@ -8,7 +8,12 @@ use pd_toolkit::rewrite::serialize;
 /// with `new_token`, if and only if the existing token (stripped of any
 /// trailing semicolon) equals `expected`.  Returns the new raw string, or
 /// `None` if the token did not match.
-fn replace_raw_token(raw: &str, token_pos: usize, expected: &str, new_token: &str) -> Option<String> {
+fn replace_raw_token(
+    raw: &str,
+    token_pos: usize,
+    expected: &str,
+    new_token: &str,
+) -> Option<String> {
     // Collect byte ranges of each whitespace-delimited token
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     let bytes = raw.as_bytes();
@@ -64,7 +69,10 @@ fn replace_raw_token(raw: &str, token_pos: usize, expected: &str, new_token: &st
 
 /// Return true if this object class is a simple send/receive type.
 fn simple_sr_class(class: &str) -> bool {
-    matches!(class, "s" | "send" | "r" | "receive" | "s~" | "r~" | "throw~" | "catch~")
+    matches!(
+        class,
+        "s" | "send" | "r" | "receive" | "s~" | "r~" | "throw~" | "catch~"
+    )
 }
 
 /// Try to rename `from` → `to` in a single raw entry.
@@ -187,7 +195,9 @@ pub fn run(
     // --- Collect all entries from all files to check if `to` already exists ---
     if !force {
         for file in &files {
-            let Ok(input) = std::fs::read_to_string(file) else { continue };
+            let Ok(input) = std::fs::read_to_string(file) else {
+                continue;
+            };
             let tok = tokenize_entries(&input);
             let entries = build_entries(&tok.entries);
             let names = collect_sr_names(&entries);
@@ -205,7 +215,9 @@ pub fn run(
     let mut total_replacements = 0usize;
 
     for file in &files {
-        let Ok(input) = std::fs::read_to_string(file) else { continue };
+        let Ok(input) = std::fs::read_to_string(file) else {
+            continue;
+        };
         let tok = tokenize_entries(&input);
         let mut entries = build_entries(&tok.entries);
 
@@ -247,7 +259,10 @@ pub fn run(
     }
 
     let mut out = if dry_run {
-        format!("DRY RUN — {} replacement(s) would be made:\n", total_replacements)
+        format!(
+            "DRY RUN — {} replacement(s) would be made:\n",
+            total_replacements
+        )
     } else {
         format!("{} replacement(s) made:\n", total_replacements)
     };

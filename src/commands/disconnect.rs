@@ -51,9 +51,7 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
         .entries
         .iter()
         .position(|e| {
-            e.kind == EntryKind::Connect
-                && e.depth == internal_depth
-                && e.raw.trim() == target_raw
+            e.kind == EntryKind::Connect && e.depth == internal_depth && e.raw.trim() == target_raw
         })
         .ok_or_else(|| {
             PdtkError::Usage(format!(

@@ -20,11 +20,7 @@ fn orphans_excludes_text_by_default() {
 #[test]
 fn orphans_include_comments_flag_shows_text() {
     let f = handcrafted("orphans.pd");
-    let out = pdtk_output(&[
-        "find-orphans",
-        f.to_str().unwrap(),
-        "--include-comments",
-    ]);
+    let out = pdtk_output(&["find-orphans", f.to_str().unwrap(), "--include-comments"]);
     assert!(out.contains("this is a comment"));
 }
 

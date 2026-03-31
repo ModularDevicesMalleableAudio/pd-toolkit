@@ -1,5 +1,5 @@
 use crate::model::{Entry, Patch};
-use similar::{capture_diff_slices, Algorithm, DiffOp};
+use similar::{Algorithm, DiffOp, capture_diff_slices};
 use std::collections::HashMap;
 
 /// Text key for LCS matching (class+args, always coords-stripped).
@@ -23,7 +23,12 @@ fn build_index_mapping(a_keys: &[String], b_keys: &[String]) -> HashMap<usize, u
     let ops = capture_diff_slices(Algorithm::Patience, a_keys, b_keys);
     let mut map = HashMap::new();
     for op in ops {
-        if let DiffOp::Equal { old_index, new_index, len } = op {
+        if let DiffOp::Equal {
+            old_index,
+            new_index,
+            len,
+        } = op
+        {
             for i in 0..len {
                 map.insert(old_index + i, new_index + i);
             }
@@ -105,7 +110,11 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
 
         for op in &ops {
             match *op {
-                DiffOp::Equal { old_index, new_index, len } => {
+                DiffOp::Equal {
+                    old_index,
+                    new_index,
+                    len,
+                } => {
                     for i in 0..len {
                         let ea = a_objs[old_index + i];
                         let eb = b_objs[new_index + i];
@@ -125,7 +134,9 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
                         }
                     }
                 }
-                DiffOp::Delete { old_index, old_len, .. } => {
+                DiffOp::Delete {
+                    old_index, old_len, ..
+                } => {
                     for i in 0..old_len {
                         let e = a_objs[old_index + i];
                         objects_removed.push(ObjectChange {
@@ -137,7 +148,9 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
                         });
                     }
                 }
-                DiffOp::Insert { new_index, new_len, .. } => {
+                DiffOp::Insert {
+                    new_index, new_len, ..
+                } => {
                     for i in 0..new_len {
                         let e = b_objs[new_index + i];
                         objects_added.push(ObjectChange {
@@ -149,7 +162,12 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
                         });
                     }
                 }
-                DiffOp::Replace { old_index, old_len, new_index, new_len } => {
+                DiffOp::Replace {
+                    old_index,
+                    old_len,
+                    new_index,
+                    new_len,
+                } => {
                     // 1:1 replacements are reported as "modified"; N:M as remove+add
                     if old_len == new_len {
                         for i in 0..old_len {
@@ -207,18 +225,28 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
         // Translated a connections (where both endpoints have a mapping)
         let mut translated_a: HashSet<(usize, usize, usize, usize)> = HashSet::new();
         for c in &a_conns {
-            if let (Some(&src_b), Some(&dst_b)) =
-                (a_to_b.get(&c.src), a_to_b.get(&c.dst))
-            {
+            if let (Some(&src_b), Some(&dst_b)) = (a_to_b.get(&c.src), a_to_b.get(&c.dst)) {
                 translated_a.insert((src_b, c.src_outlet, dst_b, c.dst_inlet));
             }
         }
 
         for &(src, outlet, dst, inlet) in b_conn_set.difference(&translated_a) {
-            connections_added.push(ConnectionChange { depth, src, src_outlet: outlet, dst, dst_inlet: inlet });
+            connections_added.push(ConnectionChange {
+                depth,
+                src,
+                src_outlet: outlet,
+                dst,
+                dst_inlet: inlet,
+            });
         }
         for &(src, outlet, dst, inlet) in translated_a.difference(&b_conn_set) {
-            connections_removed.push(ConnectionChange { depth, src, src_outlet: outlet, dst, dst_inlet: inlet });
+            connections_removed.push(ConnectionChange {
+                depth,
+                src,
+                src_outlet: outlet,
+                dst,
+                dst_inlet: inlet,
+            });
         }
     }
 
