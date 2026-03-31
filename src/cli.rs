@@ -365,6 +365,45 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Extract a subpatch into a standalone abstraction file
+    Extract {
+        /// Path to .pd file containing the subpatch
+        file: String,
+        /// Subpatch depth to extract (1 = first nested canvas)
+        #[arg(long)]
+        depth: usize,
+        /// Path to write the extracted abstraction
+        #[arg(long, value_name = "PATH")]
+        output: String,
+        /// Replace the subpatch in the source with an abstraction reference
+        #[arg(long)]
+        in_place: bool,
+        /// Create a .bak backup of the source before modifying
+        #[arg(long)]
+        backup: bool,
+    },
+
+    /// Apply any pdtk command recursively across files in a directory
+    Batch {
+        /// Directory to scan for .pd files
+        dir: String,
+        /// pdtk subcommand and flags to apply to each file (file appended last)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+        /// Only process files matching this glob (default: *.pd)
+        #[arg(long, default_value = "**/*.pd")]
+        glob: String,
+        /// List what would be done without running
+        #[arg(long)]
+        dry_run: bool,
+        /// Continue processing after errors
+        #[arg(long)]
+        continue_on_error: bool,
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Rename send/receive pairs atomically
     RenameSend {
         target: String,

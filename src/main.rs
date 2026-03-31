@@ -295,6 +295,22 @@ fn main() {
                 Err(e) => { eprintln!("{e}"); e.exit_code() }
             }
         }
+        Some(Commands::Extract { file, depth, output, in_place, backup }) => {
+            match commands::extract::run(&file, depth, &output, in_place, backup) {
+                Ok(()) => 0,
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Batch { dir, command, glob, dry_run, continue_on_error, json }) => {
+            let cmd_refs: Vec<&str> = command.iter().map(String::as_str).collect();
+            match commands::batch::run(&dir, &cmd_refs, &glob, dry_run, continue_on_error, json) {
+                Ok(result) => {
+                    if !result.output.is_empty() { println!("{}", result.output); }
+                    result.exit_code
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
         Some(Commands::Trace { file, from, to, depth, max_hops, json }) => {
             match commands::trace::run(&file, from, to, depth, max_hops, json) {
                 Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
