@@ -1,11 +1,16 @@
 pub mod arrays;
 pub mod common;
+pub mod connect;
+pub mod connections;
 pub mod delete;
+pub mod disconnect;
 pub mod find_displays;
 pub mod find_orphans;
 pub mod insert;
 pub mod list;
+pub mod modify;
 pub mod parse;
+pub mod rename_send;
 pub mod renumber;
 pub mod search;
 pub mod stats;

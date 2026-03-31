@@ -76,7 +76,7 @@ fn content_without_width_hint(raw: &str) -> &str {
 /// For GUI objects, returns the (send_arg_index, receive_arg_index) into the
 /// args() slice (0-based, after class+coords have been removed).
 /// Returns None for non-GUI objects, or for vu which only has a receive.
-fn gui_send_receive_arg_indices(class: &str) -> Option<(usize, usize)> {
+pub fn gui_send_receive_arg_indices(class: &str) -> Option<(usize, usize)> {
     match class {
         "tgl" => Some((2, 3)),
         "bng" => Some((4, 5)),
@@ -89,7 +89,7 @@ fn gui_send_receive_arg_indices(class: &str) -> Option<(usize, usize)> {
 }
 
 /// vu has only a receive field (no send).  Returns its arg index.
-fn vu_receive_arg_index() -> usize {
+pub fn vu_receive_arg_index() -> usize {
     2
 }
 

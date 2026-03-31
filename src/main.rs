@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod errors;
 mod io;
+mod types;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -207,6 +208,65 @@ fn main() {
                 e.exit_code()
             }
         },
+        Some(Commands::Modify { file, depth, index, text, in_place, backup, output }) => {
+            match commands::modify::run(&file, depth, index, &text, in_place, backup, output.as_deref()) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    code
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Connect { file, depth, src, outlet, dst, inlet, in_place, backup, output }) => {
+            match commands::connect::run(commands::connect::RunArgs {
+                file: &file,
+                depth,
+                src,
+                outlet,
+                dst,
+                inlet,
+                in_place,
+                backup,
+                output: output.as_deref(),
+            }) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    code
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Disconnect { file, depth, src, outlet, dst, inlet, in_place, backup, output }) => {
+            match commands::disconnect::run(commands::disconnect::RunArgs {
+                file: &file,
+                depth,
+                src,
+                outlet,
+                dst,
+                inlet,
+                in_place,
+                backup,
+                output: output.as_deref(),
+            }) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() { print!("{serialized}"); }
+                    code
+                }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::Connections { file, index, depth, json }) => {
+            match commands::connections::run(&file, index, depth, json) {
+                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
+        Some(Commands::RenameSend { target, from, to, in_place, backup, dry_run, force }) => {
+            match commands::rename_send::run(&target, &from, &to, in_place, backup, dry_run, force) {
+                Ok(out) => { if !out.is_empty() { println!("{out}"); } 0 }
+                Err(e) => { eprintln!("{e}"); e.exit_code() }
+            }
+        }
         None => {
             // Print help then exit 0.
             let _ = Cli::parse_from(["pdtk", "--help"]);

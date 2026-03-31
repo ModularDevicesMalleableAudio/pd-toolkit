@@ -224,4 +224,92 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Change an object's text in place without affecting index or connections
+    Modify {
+        file: String,
+        #[arg(long)]
+        depth: usize,
+        #[arg(long)]
+        index: usize,
+        /// New class and arguments (e.g. "route 1 2 3")
+        #[arg(long, value_name = "TEXT")]
+        text: String,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// Add a patch cord between two objects
+    Connect {
+        file: String,
+        #[arg(long)]
+        depth: usize,
+        #[arg(long)]
+        src: usize,
+        #[arg(long)]
+        outlet: usize,
+        #[arg(long)]
+        dst: usize,
+        #[arg(long)]
+        inlet: usize,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// Remove a specific patch cord
+    Disconnect {
+        file: String,
+        #[arg(long)]
+        depth: usize,
+        #[arg(long)]
+        src: usize,
+        #[arg(long)]
+        outlet: usize,
+        #[arg(long)]
+        dst: usize,
+        #[arg(long)]
+        inlet: usize,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long, value_name = "PATH")]
+        output: Option<String>,
+    },
+
+    /// List all connections to/from a specific object
+    Connections {
+        file: String,
+        #[arg(long)]
+        index: usize,
+        #[arg(long, default_value = "0")]
+        depth: usize,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Rename send/receive pairs atomically
+    RenameSend {
+        target: String,
+        #[arg(long)]
+        from: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        in_place: bool,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        force: bool,
+    },
 }
