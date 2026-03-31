@@ -1,77 +1,61 @@
-use clap::{Parser, Subcommand};
+mod cli;
+mod commands;
+mod errors;
 
-#[derive(Parser)]
-#[command(
-    name = "pdtk",
-    version,
-    about = "Safe parser, editor, and formatter for Pure Data patch files"
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
+use clap::Parser;
+use cli::{Cli, Commands};
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Parse a .pd file and print summary statistics
-    Parse {
-        /// Path to .pd file
-        file: String,
-
-        /// Output results as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Check patch structure and connection integrity
-    Validate {
-        /// Path to .pd file
-        file: String,
-
-        /// Enable strict validation checks
-        #[arg(long)]
-        strict: bool,
-
-        /// Output results as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// List objects with indices and details
-    List {
-        /// Path to .pd file
-        file: String,
-
-        /// Subpatch depth to list (0 = top-level)
-        #[arg(long)]
-        depth: Option<usize>,
-
-        /// Output results as JSON
-        #[arg(long)]
-        json: bool,
-    },
-}
-
-fn main() -> anyhow::Result<()> {
+fn main() {
     let cli = Cli::parse();
+    let verbose = cli.verbose;
 
-    match cli.command {
-        Some(Commands::Parse { file, .. }) => {
-            eprintln!("pdtk parse: not yet implemented (file: {})", file);
-            std::process::exit(2);
+    let exit = match cli.command {
+        Some(Commands::Parse { file, json, output }) => {
+            match commands::parse::run(&file, json, output.as_deref(), verbose) {
+                Ok(out) => {
+                    println!("{out}");
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
         }
-        Some(Commands::Validate { file, .. }) => {
-            eprintln!("pdtk validate: not yet implemented (file: {})", file);
-            std::process::exit(2);
+        Some(Commands::List { file, depth, json, output }) => {
+            match commands::list::run(&file, depth, json, output.as_deref()) {
+                Ok(out) => {
+                    if !out.is_empty() {
+                        println!("{out}");
+                    }
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
         }
-        Some(Commands::List { file, .. }) => {
-            eprintln!("pdtk list: not yet implemented (file: {})", file);
-            std::process::exit(2);
+        Some(Commands::Validate { file, strict, json, output }) => {
+            match commands::validate::run(&file, strict, json, output.as_deref()) {
+                Ok(result) => {
+                    if !result.output.is_empty() {
+                        println!("{}", result.output);
+                    }
+                    result.exit_code
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
         }
         None => {
-            Cli::parse_from(["pdtk", "--help"]);
+            // Print help then exit 0.
+            let _ = Cli::parse_from(["pdtk", "--help"]);
+            0
         }
-    }
+    };
 
-    Ok(())
+    std::process::exit(exit);
 }
