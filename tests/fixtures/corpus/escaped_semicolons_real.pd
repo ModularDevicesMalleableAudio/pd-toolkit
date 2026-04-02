@@ -1,0 +1,49 @@
+#N canvas 58 90 637 764 10;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 01_arrays_exist 16 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 651 graph;
+#X msg 19 89 \; 01_arrays_exist read ../midi_io/data/01_arrays_exist.mseq
+;
+#X msg 19 119 \; 02_arrays_exist read ../midi_io/data/02_arrays_exist.mseq
+;
+#X msg 19 149 \; 03_arrays_exist read ../midi_io/data/03_arrays_exist.mseq
+;
+#X msg 19 179 \; 04_arrays_exist read ../midi_io/data/04_arrays_exist.mseq
+;
+#X msg 19 239 \; 06_arrays_exist read ../midi_io/data/06_arrays_exist.mseq
+;
+#X msg 19 209 \; 05_arrays_exist read ../midi_io/data/05_arrays_exist.mseq
+;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 02_arrays_exist 16 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 521 graph;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 03_arrays_exist 16 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 391 graph;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 04_arrays_exist 16 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 261 graph;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 05_arrays_exist 16 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 141 graph;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array 06_arrays_exist 16 float 3;
+#A 0 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 2 16 -1 200 100 1 0 0;
+#X restore 397 21 graph;
+#X obj 19 15 loadbang;
+#X obj 100 13 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
+#X obj 19 36 delay 80;
+#X obj 19 66 metro 50;
+#X connect 12 0 14 0;

@@ -1,0 +1,17 @@
+#N canvas 0 22 800 600 12;
+#X obj 50 50 loadbang;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array swing_amount 17 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 7 16 0 200 140 1 0 0;
+#X restore 50 100 graph;
+#N canvas 0 0 450 300 processor 0;
+#X obj 50 50 inlet;
+#X obj 50 100 + 1;
+#X obj 50 150 outlet;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X restore 50 200 pd processor;
+#X obj 50 300 print;
+#X connect 0 0 2 0;
+#X connect 2 0 3 0;

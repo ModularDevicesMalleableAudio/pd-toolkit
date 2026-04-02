@@ -1,0 +1,15 @@
+#N canvas 114 726 629 354 10;
+#X obj 80 239 hradio 15 1 0 4 empty empty empty 0 -8 0 10 -262144 -1
+-1 0;
+#X obj 98 139 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
+#X obj 80 197 prob;
+#C restore;
+#X text 114 197 last 4 steps \, last 8 steps \, whole 16;
+#X obj 97 218 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
+#X obj 116 138 inlet;
+#X obj 80 284 s ad_drop_length;
+#X connect 0 0 6 0;
+#X connect 1 0 2 0;
+#X connect 5 0 2 0;

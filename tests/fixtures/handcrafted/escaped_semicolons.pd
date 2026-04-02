@@ -1,0 +1,10 @@
+#N canvas 0 22 450 300 12;
+#X msg 19 89 \; 01_arrays_exist read ../midi_io/data/01_arrays_exist.mseq
+;
+#X msg 19 119 \; 02_arrays_exist read ../midi_io/data/02_arrays_exist.mseq
+;
+#X obj 50 200 loadbang;
+#X obj 50 250 t b b;
+#X connect 2 0 3 0;
+#X connect 3 0 0 0;
+#X connect 3 1 1 0;

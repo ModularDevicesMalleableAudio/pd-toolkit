@@ -1,0 +1,11 @@
+#N canvas 0 22 450 300 12;
+#N canvas 0 0 450 300 my_sub 0;
+#X obj 50 50 inlet;
+#X obj 50 100 + 1;
+#X obj 50 150 outlet;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X restore 50 100 pd my_sub;
+#X f 38;
+#X obj 50 150 print result;
+#X connect 0 0 1 0;

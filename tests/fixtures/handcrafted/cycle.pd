@@ -1,0 +1,11 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 f;
+#X obj 50 100 + 1;
+#X obj 50 150 mod 10;
+#X obj 150 50 metro 500;
+#X obj 150 100 loadbang;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 2 0 0 1;
+#X connect 3 0 0 0;
+#X connect 4 0 3 0;

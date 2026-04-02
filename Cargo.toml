@@ -1,0 +1,73 @@
+[package]
+name = "pd-toolkit"
+version = "0.1.0"
+edition = "2024"
+description = "Safe structural editing, validation, & analysis for Pure Data .pd patch files 🦀"
+license = "MIT"
+readme = "README.md"
+
+[[bin]]
+name = "pdtk"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4", features = ["derive", "string"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Serialization / JSON output
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Graph algorithms (SCC, toposort, layout)
+petgraph = "0.7"
+
+# Pattern matching
+regex = "1"
+glob = "0.3"
+
+# Directory traversal
+walkdir = "2"
+
+# Diff algorithm (LCS for structural diff)
+similar = "2"
+
+# Parallel batch processing (optional feature)
+rayon = "1"
+
+# Shell completion generation (runtime subcommand)
+clap_complete = "4"
+
+[dev-dependencies]
+# Snapshot / golden file testing
+insta = { version = "1", features = ["yaml"] }
+
+# Property-based testing
+proptest = "1"
+
+# CLI integration testing
+assert_cmd = "2"
+predicates = "3"
+
+# Temporary files for mutation tests
+tempfile = "3"
+
+[build-dependencies]
+# Man page generation from clap definitions
+clap_mangen = "0.2"
+
+# Shell completion generation
+clap_complete = "4"
+
+# Needed for build.rs to access the CLI struct
+clap = { version = "4", features = ["derive", "string"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+panic = "abort"
+codegen-units = 1

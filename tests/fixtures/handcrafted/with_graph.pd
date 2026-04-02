@@ -1,0 +1,11 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 loadbang;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array my_array 100 float 3;
+#A 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X coords 0 1 99 -1 200 140 1 0 0;
+#X restore 50 100 graph;
+#X obj 50 200 tabread my_array;
+#X obj 50 250 print;
+#X connect 0 0 2 0;
+#X connect 2 0 3 0;

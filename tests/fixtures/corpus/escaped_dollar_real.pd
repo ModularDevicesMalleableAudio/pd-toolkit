@@ -1,0 +1,8 @@
+#N canvas 384 310 251 261 10;
+#X obj 53 83 sel 0;
+#X msg 53 104 copy blank_8;
+#X obj 53 131 arraycopy s\$1_mute_array;
+#X obj 53 62 r s\$1allmute;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 3 0 0 0;

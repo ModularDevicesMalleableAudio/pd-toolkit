@@ -1,0 +1,7 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 loadbang;
+#X obj 50 100 print connected;
+#X obj 200 50 osc~ 440;
+#X text 200 100 this is a comment;
+#X obj 200 150 f 42;
+#X connect 0 0 1 0;
