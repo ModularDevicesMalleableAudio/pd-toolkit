@@ -18,3 +18,9 @@ target
 
 # Added by cargo
 /target
+
+# Generated at build time by build.rs
+/man/
+/completions/
+
+.pi/skills/git-conventions
