@@ -1,7 +1,10 @@
 use crate::errors::PdtkError;
 use pd_toolkit::{
     model::{Connection, EntryKind},
-    parser::parse,
+    parser::{
+        escape::{has_unescaped_dollar_digit, has_unescaped_semicolon_in_body},
+        parse,
+    },
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -99,6 +102,34 @@ pub fn run(
                     conn.src, conn.src_outlet, conn.dst, conn.dst_inlet
                 ));
             }
+        }
+    }
+
+    // 4) Escaping hygiene checks for retrospective bug discovery.
+    for (i, entry) in patch.entries.iter().enumerate() {
+        if matches!(
+            entry.kind,
+            EntryKind::CanvasOpen
+                | EntryKind::Connect
+                | EntryKind::Coords
+                | EntryKind::ArrayData
+                | EntryKind::WidthHint
+        ) {
+            continue;
+        }
+
+        if has_unescaped_dollar_digit(&entry.raw) {
+            warnings.push(format!(
+                "entry {i}: unescaped $-digit token found (expected \\$N in .pd text): {}",
+                entry.raw
+            ));
+        }
+
+        if has_unescaped_semicolon_in_body(&entry.raw) {
+            warnings.push(format!(
+                "entry {i}: unescaped ';' found inside entry body (use \\;): {}",
+                entry.raw
+            ));
         }
     }
 

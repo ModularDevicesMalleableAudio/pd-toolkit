@@ -56,9 +56,50 @@ pub fn has_unescaped_semicolon(text: &str) -> bool {
     false
 }
 
+/// Return true if `text` contains any unescaped `$` followed by a digit.
+pub fn has_unescaped_dollar_digit(text: &str) -> bool {
+    let bytes = text.as_bytes();
+
+    for i in 0..bytes.len() {
+        if bytes[i] != b'$' {
+            continue;
+        }
+        if i + 1 >= bytes.len() || !bytes[i + 1].is_ascii_digit() {
+            continue;
+        }
+
+        let mut backslashes = 0usize;
+        let mut j = i;
+        while j > 0 && bytes[j - 1] == b'\\' {
+            backslashes += 1;
+            j -= 1;
+        }
+
+        if backslashes.is_multiple_of(2) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Return true if the entry body (excluding a trailing terminator `;`) contains
+/// an unescaped semicolon.
+pub fn has_unescaped_semicolon_in_body(entry_raw: &str) -> bool {
+    let trimmed = entry_raw.trim_end();
+    if let Some(body) = trimmed.strip_suffix(';') {
+        has_unescaped_semicolon(body)
+    } else {
+        has_unescaped_semicolon(trimmed)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{escape_pd_dollars, has_unescaped_semicolon};
+    use super::{
+        escape_pd_dollars, has_unescaped_dollar_digit, has_unescaped_semicolon,
+        has_unescaped_semicolon_in_body,
+    };
 
     #[test]
     fn escapes_bare_dollar_digit() {
@@ -82,5 +123,19 @@ mod tests {
         assert!(has_unescaped_semicolon("foo ; bar"));
         assert!(has_unescaped_semicolon(r"foo \\; bar"));
         assert!(!has_unescaped_semicolon(r"foo \; bar"));
+    }
+
+    #[test]
+    fn detects_unescaped_dollar_digit() {
+        assert!(has_unescaped_dollar_digit("$1"));
+        assert!(has_unescaped_dollar_digit("foo $2 bar"));
+        assert!(!has_unescaped_dollar_digit(r"\$1"));
+        assert!(!has_unescaped_dollar_digit("expr $f1 + $f2"));
+    }
+
+    #[test]
+    fn detects_unescaped_semicolon_in_body_only() {
+        assert!(has_unescaped_semicolon_in_body("#X msg 10 10 foo ; bar;"));
+        assert!(!has_unescaped_semicolon_in_body(r"#X msg 10 10 foo \; bar;"));
     }
 }

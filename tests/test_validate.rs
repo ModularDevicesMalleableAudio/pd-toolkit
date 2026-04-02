@@ -152,6 +152,50 @@ fn validate_nonexistent_file_exits_3() {
 }
 
 #[test]
+fn validate_warns_on_unescaped_dollar_digit() {
+    let input = "#N canvas 0 22 450 300 12;\n#X obj 10 10 $1;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = stdout_string(&out);
+    assert!(stdout.contains("warning"));
+    assert!(stdout.contains("unescaped $-digit token"));
+}
+
+#[test]
+fn validate_warns_on_unescaped_semicolon_in_entry_body() {
+    let input = "#N canvas 0 22 450 300 12;\n#X msg 10 10 foo ; bar;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = stdout_string(&out);
+    assert!(stdout.contains("warning"));
+    assert!(stdout.contains("unescaped ';'"));
+}
+
+#[test]
+fn validate_json_reports_escaping_warnings() {
+    let input = "#N canvas 0 22 450 300 12;\n#X obj 10 10 $1;\n#X msg 10 40 foo ; bar;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap(), "--json"]);
+    assert_eq!(out.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
+    let warnings = json["warnings"].as_array().unwrap();
+    assert!(warnings
+        .iter()
+        .any(|w| w.as_str().unwrap_or("").contains("unescaped $-digit token")));
+    assert!(warnings
+        .iter()
+        .any(|w| w.as_str().unwrap_or("").contains("unescaped ';'")));
+}
+
+#[test]
 fn validate_output_flag_writes_to_file() {
     let f = handcrafted("simple_chain.pd");
     let tmp = tempfile::NamedTempFile::new().unwrap();
