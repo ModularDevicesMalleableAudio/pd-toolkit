@@ -10,53 +10,6 @@ modified unless explicitly requested with `--in-place`.
 
 ---
 
-## Install
-
-### Download a pre-built binary
-
-```sh
-# Linux x86_64
-curl -fsSL https://github.com/<user>/pd-toolkit/releases/latest/download/pdtk-x86_64-linux \
-    -o pdtk && chmod +x pdtk
-
-# Linux aarch64 (Raspberry Pi 4, static musl — no runtime deps)
-curl -fsSL https://github.com/<user>/pd-toolkit/releases/latest/download/pdtk-aarch64-linux-musl \
-    -o pdtk && chmod +x pdtk
-
-# macOS Apple Silicon
-curl -fsSL https://github.com/<user>/pd-toolkit/releases/latest/download/pdtk-aarch64-macos \
-    -o pdtk && chmod +x pdtk
-```
-
-### Build from source
-
-Requires Rust stable (≥ 1.77):
-
-```sh
-git clone https://github.com/<user>/pd-toolkit
-cd pd-toolkit
-cargo build --release
-# Binary at target/release/pdtk
-```
-
-### Install into a project
-
-```sh
-# For a sequencer / live-coding project:
-./scripts/install-pdtk.sh          # auto-detects platform, downloads latest release
-./scripts/install-pdtk.sh v0.3.0   # pin to a specific version
-```
-
-### Shell completions
-
-```sh
-pdtk completions bash > ~/.local/share/bash-completion/completions/pdtk
-pdtk completions zsh  > ~/.zfunc/_pdtk
-pdtk completions fish > ~/.config/fish/completions/pdtk.fish
-```
-
----
-
 ## Quick start
 
 ```sh
@@ -71,9 +24,9 @@ pdtk search   patch.pd --type route             # find all route objects
 pdtk search   patch.pd --type send --text "clk*"  # sends whose name starts with clk
 pdtk find-orphans  patch.pd                     # objects with no connections
 pdtk find-displays patch.pd                     # connected debug number boxes
-pdtk deps     patch.pd --missing               # abstractions not found on disk
+pdtk deps     patch.pd --missing                # abstractions not found on disk
 pdtk trace    patch.pd --from 0                 # what does object 0 connect to?
-pdtk diff     old.pd new.pd --ignore-coords    # what changed (ignoring layout)?
+pdtk diff     old.pd new.pd --ignore-coords     # what changed (ignoring layout)?
 
 # Edit safely
 pdtk insert   patch.pd --depth 0 --index 2 --entry '#X obj 50 75 bang;' --in-place
@@ -91,7 +44,7 @@ pdtk extract  patch.pd --depth 1 --output my_abs.pd --in-place
 
 # Batch
 pdtk batch    src/ validate                    # validate all .pd files in src/
-pdtk batch    src/ format --in-place          # auto-format all files
+pdtk batch    src/ format --in-place           # auto-format all files
 ```
 
 ---
@@ -127,17 +80,6 @@ pdtk batch    src/ format --in-place          # auto-format all files
 
 ---
 
-## Exit codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Validation / lint errors |
-| 2 | Parse / usage errors |
-| 3 | I/O errors |
-
----
-
 ## Safety guarantees
 
 - **`format`** only modifies X/Y coordinate fields — an internal assertion
@@ -150,11 +92,135 @@ pdtk batch    src/ format --in-place          # auto-format all files
 
 ---
 
-## Man pages
+## Examples
 
-Man pages are generated at build time in the `man/` directory:
+### Rename a send/receive pair across an entire project
+
+You renamed a clock bus and need every `s clock_main` / `r clock_main` in every
+patch — including GUI send/receive fields on toggles and number boxes — updated
+atomically:
 
 ```sh
+pdtk rename-send src/ --from clock_main --to clock_v2 --dry-run
+pdtk rename-send src/ --from clock_main --to clock_v2 --in-place --backup
+```
+
+`--dry-run` prints every line that would change. `--backup` writes `.bak` files
+before overwriting so you can diff or roll back.
+
+### Replace an object without disturbing connections
+
+Swap a `route` for a `route 1 2 3` at depth 0, index 3. The object index and
+all patch cords are preserved:
+
+```sh
+pdtk modify patch.pd --depth 0 --index 3 --text 'route 1 2 3' --in-place
+```
+
+If the new text would leave an existing outlet connection out of range, pdtk
+prints a warning but still writes (the connection may need removing separately).
+
+### Check a project before deploying to hardware
+
+Validate every patch and list any abstractions that can't be found on disk:
+
+```sh
+pdtk batch src/ validate
+pdtk deps  src/main.pd --missing
+```
+
+Both commands exit non-zero if problems are found, so they drop cleanly into a
+`Makefile` or CI step.
+
+### Extract a subpatch into a reusable abstraction
+
+Pull depth-1 out of `sequencer.pd` into its own file. pdtk infers the required
+inlet/outlet count from the existing connections, writes the new file, and
+replaces the subpatch in the source with an object box:
+
+```sh
+pdtk extract sequencer.pd --depth 1 --output step_counter.pd --in-place
+```
+
+---
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Validation / lint errors |
+| 2 | Parse / usage errors |
+| 3 | I/O errors |
+
+---
+
+## Install
+
+### Download a pre-built binary
+
+```sh
+# Linux x86_64
+curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-x86_64-linux \
+    -o pdtk && chmod +x pdtk
+
+# Linux aarch64 (Raspberry Pi 4, static musl — no runtime deps)
+curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-aarch64-linux-musl \
+    -o pdtk && chmod +x pdtk
+
+# macOS Apple Silicon
+curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-aarch64-macos \
+    -o pdtk && chmod +x pdtk
+```
+
+### Build from source
+
+Requires Rust stable (≥ 1.77):
+
+```sh
+git clone https://github.com/ModularDevicesMalleableAudio/pd-toolkit
+cd pd-toolkit
+cargo build --release
+# Binary at target/release/pdtk
+```
+
+### Install into a project
+
+For projects that vendor their own tools (e.g. a sequencer repo), use the
+install script to download the right binary for the current platform into a
+local `.tools/bin/` directory:
+
+```sh
+# Latest release — auto-detects platform (Linux x86_64/aarch64, macOS arm64/x86_64)
+./scripts/install-pdtk.sh
+
+# Pin to a specific version
+./scripts/install-pdtk.sh v0.3.0
+
+# Custom install location
+PDTK_INSTALL_DIR=bin ./scripts/install-pdtk.sh
+```
+
+The binary is placed at `.tools/bin/pdtk` by default (matching the `make
+install-local` layout).
+
+### Shell completions
+
+```sh
+pdtk completions bash > ~/.local/share/bash-completion/completions/pdtk
+pdtk completions zsh  > ~/.zfunc/_pdtk
+pdtk completions fish > ~/.config/fish/completions/pdtk.fish
+```
+
+---
+
+## Man pages
+
+Man pages are generated into `man/` by `build.rs` when you run `cargo build`.
+They are not committed to the repository.
+
+```sh
+cargo build                   # generates man/ if it doesn't exist yet
 man -l man/pdtk.1             # top-level man page
 man -l man/pdtk-format.1      # per-command page
 ```
