@@ -262,6 +262,25 @@ fn rename_send_ab_then_ba_roundtrip() {
 }
 
 #[test]
+fn rename_send_auto_escapes_dollar_args() {
+    let (tmp, _) = with_copy("dollar_signs.pd");
+
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "s$1_output",
+        "--to",
+        "s$2_output",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains(r"s\$2_output"));
+    assert!(!result.contains(r"s\$1_output"));
+}
+
+#[test]
 fn rename_send_validates_after_mutation() {
     let (tmp, _) = with_copy("send_receive.pd");
 

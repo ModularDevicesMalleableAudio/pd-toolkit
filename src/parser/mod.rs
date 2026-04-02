@@ -1,4 +1,5 @@
 pub mod classify;
+pub mod escape;
 pub mod index;
 pub mod tokenizer;
 

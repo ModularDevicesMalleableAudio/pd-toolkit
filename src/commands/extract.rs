@@ -2,6 +2,7 @@ use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
 use pd_toolkit::model::{Connection, Entry, EntryKind};
+use pd_toolkit::parser::escape::escape_pd_dollars;
 use pd_toolkit::parser::{assign_depth_and_indices, build_entries, parse, tokenize_entries};
 use pd_toolkit::rewrite::serialize;
 
@@ -164,6 +165,7 @@ pub fn run(
             .and_then(|s| s.to_str())
             .unwrap_or(output_path)
             .to_string();
+        let abs_name = escape_pd_dollars(&abs_name);
 
         let restore_x = src_entries[restore_pos].x().unwrap_or(50);
         let restore_y = src_entries[restore_pos].y().unwrap_or(100);

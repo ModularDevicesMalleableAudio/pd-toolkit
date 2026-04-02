@@ -1,6 +1,7 @@
 use crate::errors::PdtkError;
 use crate::io;
 use pd_toolkit::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
+use pd_toolkit::parser::escape::escape_pd_dollars;
 use pd_toolkit::parser::{build_entries, tokenize_entries};
 use pd_toolkit::rewrite::serialize;
 
@@ -191,6 +192,8 @@ pub fn run(
     force: bool,
 ) -> Result<String, PdtkError> {
     let files = io::scan_pd_files(target)?;
+    let from_escaped = escape_pd_dollars(from);
+    let to_escaped = escape_pd_dollars(to);
 
     // --- Collect all entries from all files to check if `to` already exists ---
     if !force {
@@ -201,7 +204,7 @@ pub fn run(
             let tok = tokenize_entries(&input);
             let entries = build_entries(&tok.entries);
             let names = collect_sr_names(&entries);
-            if names.contains(to) {
+            if names.contains(&to_escaped) {
                 return Err(PdtkError::Usage(format!(
                     "target name '{}' already exists in {} — use --force to override",
                     to,
@@ -223,7 +226,7 @@ pub fn run(
 
         let mut file_replacements = 0usize;
         for e in entries.iter_mut() {
-            if let Some(new_raw) = rename_in_entry(&e.raw, &e.kind, from, to) {
+            if let Some(new_raw) = rename_in_entry(&e.raw, &e.kind, &from_escaped, &to_escaped) {
                 report_lines.push(format!(
                     "{}: {} → {}",
                     file.display(),

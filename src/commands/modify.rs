@@ -3,6 +3,7 @@ use crate::errors::PdtkError;
 use crate::io;
 use crate::types::signatures::outlet_count;
 use pd_toolkit::model::EntryKind;
+use pd_toolkit::parser::escape::{escape_pd_dollars, has_unescaped_semicolon};
 use pd_toolkit::parser::parse;
 use pd_toolkit::rewrite::serialize;
 
@@ -74,7 +75,15 @@ pub fn run(
     let old_args: Vec<String> = entry.args();
     let _ = (old_args, old_class); // used only for outlet-count warning lookup
 
-    let new_parts: Vec<&str> = new_text.split_whitespace().collect();
+    if has_unescaped_semicolon(new_text) {
+        return Err(PdtkError::Usage(
+            "text contains an unescaped ';' — use \\; for literal semicolons".to_string(),
+        ));
+    }
+
+    let escaped_text = escape_pd_dollars(new_text);
+
+    let new_parts: Vec<&str> = escaped_text.split_whitespace().collect();
     let new_class = new_parts.first().copied().unwrap_or("");
     let new_args: Vec<&str> = new_parts.get(1..).unwrap_or(&[]).to_vec();
 
@@ -107,7 +116,7 @@ pub fn run(
         EntryKind::SymbolAtom => "symbolatom",
         _ => "obj",
     };
-    let new_raw = format!("#X {prefix} {x} {y} {new_text};");
+    let new_raw = format!("#X {prefix} {x} {y} {escaped_text};");
     patch.entries[entry_pos].raw = new_raw;
 
     let serialized = serialize(&patch);

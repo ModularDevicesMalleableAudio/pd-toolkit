@@ -189,6 +189,262 @@ fn modify_special_chars_in_text_handled() {
     assert!(result.contains(r"s\$1.\$2"));
 }
 
+// ----- Dollar-sign / creation-argument escaping tests -----
+
+/// When the user passes a bare `$1` as text, the .pd file must contain `\$1`.
+/// In Pure Data's file format the tokeniser strips the backslash, so `\$1`
+/// is the on-disk representation of a `$1` creation-argument reference.
+#[test]
+fn modify_unescaped_dollar_gets_backslash_escaped() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "$1",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains(r"\$1"),
+        "expected \\$1 in output, got:\n{result}"
+    );
+    assert!(
+        !result.contains("\\\\$"),
+        "dollar sign must not be double-escaped:\n{result}"
+    );
+}
+
+/// When the user passes `\$1` (already escaped), the output must contain
+/// exactly `\$1` — no further backslash should be added.
+#[test]
+fn modify_already_escaped_dollar_not_doubled() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"\$1",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains(r"\$1"),
+        "expected \\$1 in output, got:\n{result}"
+    );
+    assert!(
+        !result.contains(r"\\$"),
+        "pre-escaped dollar must not be double-escaped:\n{result}"
+    );
+}
+
+/// Dollars embedded inside a longer token must also be escaped.
+/// `s$1_output` should become `s\$1_output` in the file.
+#[test]
+fn modify_dollar_inside_token_gets_escaped() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 r fixed_name;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "r s$1_output",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains(r"s\$1_output"),
+        "expected s\\$1_output in output, got:\n{result}"
+    );
+}
+
+/// Multiple dollar references in a single text must each be individually escaped.
+#[test]
+fn modify_multiple_dollar_args_all_escaped() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 r fixed;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "route $1 $2 $3",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains(r"\$1") && result.contains(r"\$2") && result.contains(r"\$3"),
+        "expected all dollar refs escaped, got:\n{result}"
+    );
+}
+
+/// A mix of already-escaped and bare dollars in the same text must produce
+/// exactly one backslash per dollar.  `\$1 $2` → `\$1 \$2`.
+#[test]
+fn modify_mixed_escaped_and_bare_dollars() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 r fixed;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"\$1 $2",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    // Both should appear as \$N; neither should be double-escaped
+    assert!(
+        result.contains(r"\$1") && result.contains(r"\$2"),
+        "expected both refs escaped, got:\n{result}"
+    );
+    assert!(
+        !result.contains(r"\\$"),
+        "no double-escaping allowed:\n{result}"
+    );
+}
+
+/// `expr` uses `$f1` / `$f2` syntax where `$` is NOT followed by a digit.
+/// PD does not escape these — they must pass through unchanged.
+#[test]
+fn modify_expr_dollar_f_not_escaped() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 + 1;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "expr $f1 + $f2",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("expr $f1 + $f2"),
+        "expr $fN syntax must NOT be escaped, got:\n{result}"
+    );
+    assert!(
+        !result.contains(r"\$f"),
+        "$f must not gain a backslash:\n{result}"
+    );
+}
+
+/// Text with no dollar signs must pass through unchanged.
+#[test]
+fn modify_rejects_unescaped_semicolon_in_text() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "foo ; bar",
+        "--in-place",
+    ]);
+
+    assert_ne!(out.status.code(), Some(0));
+}
+
+#[test]
+fn modify_accepts_escaped_semicolon_in_text() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"foo \; bar",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains(r"foo \; bar"));
+}
+
+#[test]
+fn modify_no_dollars_unchanged() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 f;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "+ 1",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("#X obj 50 50 + 1;"), "got:\n{result}");
+}
+
 #[test]
 fn modify_validates_after_mutation() {
     let f = handcrafted("simple_chain.pd");

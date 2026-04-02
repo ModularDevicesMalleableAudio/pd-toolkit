@@ -180,6 +180,30 @@ fn extract_works_on_deeply_nested_subpatch() {
 // Backup flag
 
 #[test]
+fn extract_in_place_escapes_dollar_in_abstraction_name() {
+    let src = std::fs::read_to_string(handcrafted("nested_subpatch.pd")).unwrap();
+    let src_tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(src_tmp.path(), &src).unwrap();
+
+    let out_dir = tempfile::tempdir().unwrap();
+    let out_path = out_dir.path().join("abs_$1_name.pd");
+
+    run_pdtk(&[
+        "extract",
+        src_tmp.path().to_str().unwrap(),
+        "--depth",
+        "1",
+        "--output",
+        out_path.to_str().unwrap(),
+        "--in-place",
+    ]);
+
+    let modified = std::fs::read_to_string(src_tmp.path()).unwrap();
+    assert!(modified.contains(r"abs_\$1_name"));
+    assert!(!modified.contains("abs_$1_name;"));
+}
+
+#[test]
 fn extract_in_place_backup_creates_bak() {
     let src = std::fs::read_to_string(handcrafted("nested_subpatch.pd")).unwrap();
     let src_tmp = tempfile::NamedTempFile::new().unwrap();
