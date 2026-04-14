@@ -20,13 +20,42 @@ pub fn run(
     let internal_depth = depth + 1;
 
     // Find and validate the entry to delete
-    let _delete_pos = entries
+    let delete_pos = entries
         .iter()
         .position(|e| e.depth == internal_depth && e.object_index == Some(index))
         .ok_or_else(|| PdtkError::Usage(format!("no object at depth {depth}, index {index}")))?;
 
-    // Remove the entry
-    entries.remove(_delete_pos);
+    // When the target is a subpatch restore, remove the entire span from the
+    // matching #N canvas opener through the #X restore line (inclusive).
+    // Walk backward from delete_pos balancing restore/canvas pairs to find
+    // the canvas that opened this subpatch.
+    let span_start = if entries[delete_pos].kind == EntryKind::Restore {
+        let mut balance: i32 = 0;
+        let mut canvas_pos = None;
+        for i in (0..delete_pos).rev() {
+            match entries[i].kind {
+                EntryKind::Restore => balance += 1,
+                EntryKind::CanvasOpen => {
+                    if balance == 0 {
+                        canvas_pos = Some(i);
+                        break;
+                    }
+                    balance -= 1;
+                }
+                _ => {}
+            }
+        }
+        canvas_pos.ok_or_else(|| {
+            PdtkError::Usage(format!(
+                "no matching #N canvas found for restore at depth {depth}, index {index}"
+            ))
+        })?
+    } else {
+        delete_pos
+    };
+
+    // Remove the span (canvas+contents+restore, or just the single entry)
+    entries.drain(span_start..=delete_pos);
 
     // Remove all connections that reference the deleted object at this depth
     entries.retain(|e| {
