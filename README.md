@@ -157,22 +157,6 @@ pdtk extract sequencer.pd --depth 1 --output step_counter.pd --in-place
 
 ## Install
 
-### Download a pre-built binary
-
-```sh
-# Linux x86_64
-curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-x86_64-linux \
-    -o pdtk && chmod +x pdtk
-
-# Linux aarch64 (Raspberry Pi 4, static musl — no runtime deps)
-curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-aarch64-linux-musl \
-    -o pdtk && chmod +x pdtk
-
-# macOS Apple Silicon
-curl -fsSL https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases/latest/download/pdtk-aarch64-macos \
-    -o pdtk && chmod +x pdtk
-```
-
 ### Build from source
 
 Requires Rust stable (≥ 1.77):
@@ -184,25 +168,12 @@ cargo build --release
 # Binary at target/release/pdtk
 ```
 
-### Install into a project
-
-For projects that vendor their own tools (e.g. a sequencer repo), use the
-install script to download the right binary for the current platform into a
-local `.tools/bin/` directory:
+To install into a local `.tools/bin/` directory (matching the `make
+install-local` layout):
 
 ```sh
-# Latest release — auto-detects platform (Linux x86_64/aarch64, macOS arm64/x86_64)
-./scripts/install-pdtk.sh
-
-# Pin to a specific version
-./scripts/install-pdtk.sh v0.3.0
-
-# Custom install location
-PDTK_INSTALL_DIR=bin ./scripts/install-pdtk.sh
+cargo install --path . --root .tools
 ```
-
-The binary is placed at `.tools/bin/pdtk` by default (matching the `make
-install-local` layout).
 
 ### Shell completions
 
