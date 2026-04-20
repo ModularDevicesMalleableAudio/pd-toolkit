@@ -371,7 +371,10 @@ fn delete_subpatch_renumbers_connections_correctly() {
     // Inner connections are gone along with the subpatch; outer connections
     // touching the deleted index are removed; only bang→print survives.
     let connect_count = result.matches("#X connect").count();
-    assert_eq!(connect_count, 1, "exactly one connection must remain; got:\n{result}");
+    assert_eq!(
+        connect_count, 1,
+        "exactly one connection must remain; got:\n{result}"
+    );
     assert!(
         result.contains("#X connect 1 0 2 0;"),
         "bang→print must be renumbered from 2→3 to 1→2; got:\n{result}"
@@ -438,7 +441,10 @@ fn delete_subpatch_with_nested_inner_canvases() {
     );
     // Only root canvas should remain
     let canvas_count = result.matches("#N canvas").count();
-    assert_eq!(canvas_count, 1, "only root canvas must remain; got:\n{result}");
+    assert_eq!(
+        canvas_count, 1,
+        "only root canvas must remain; got:\n{result}"
+    );
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(
@@ -478,7 +484,10 @@ fn delete_first_of_two_sibling_subpatches_renumbers_second() {
     assert!(result.contains("print from_b"), "print from_b must survive");
 
     let canvas_count = result.matches("#N canvas").count();
-    assert_eq!(canvas_count, 2, "root + sub_b must be the only canvases; got:\n{result}");
+    assert_eq!(
+        canvas_count, 2,
+        "root + sub_b must be the only canvases; got:\n{result}"
+    );
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(

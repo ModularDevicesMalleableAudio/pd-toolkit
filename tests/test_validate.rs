@@ -187,12 +187,16 @@ fn validate_json_reports_escaping_warnings() {
     assert_eq!(out.status.code(), Some(0));
     let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
     let warnings = json["warnings"].as_array().unwrap();
-    assert!(warnings
-        .iter()
-        .any(|w| w.as_str().unwrap_or("").contains("unescaped $-digit token")));
-    assert!(warnings
-        .iter()
-        .any(|w| w.as_str().unwrap_or("").contains("unescaped ';'")));
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap_or("").contains("unescaped $-digit token"))
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap_or("").contains("unescaped ';'"))
+    );
 }
 
 #[test]

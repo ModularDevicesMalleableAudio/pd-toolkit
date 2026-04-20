@@ -251,18 +251,23 @@ pub struct DepEntry {
 }
 
 /// Collect abstraction search paths from `#X declare -path dir` entries in a file.
+///
+/// Paths are resolved relative to the patch file's directory, matching Pd's
+/// behavior. The trailing `;` entry terminator is stripped from path tokens.
 fn declare_paths(file: &Path, content: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let base = file.parent().unwrap_or(Path::new("."));
     for line in content.lines() {
         let t = line.trim();
         if t.starts_with("#X declare") {
-            let parts: Vec<&str> = t.split_whitespace().collect();
+            let parts: Vec<&str> = t.trim_end_matches(';').split_whitespace().collect();
             let mut i = 2;
             while i + 1 < parts.len() {
                 if parts[i] == "-path" {
-                    let dir = base.join(parts[i + 1]);
-                    paths.push(dir);
+                    let raw = parts[i + 1].trim_end_matches(';');
+                    if !raw.is_empty() {
+                        paths.push(base.join(raw));
+                    }
                     i += 2;
                 } else {
                     i += 1;
@@ -288,6 +293,22 @@ fn locate_abstraction(name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
 /// Analyse one file and collect dependency entries.
 /// `visited` prevents re-processing the same file in recursive mode.
 pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>) -> Vec<DepEntry> {
+    analyse_file_with_ancestors(file, recursive, visited, &[])
+}
+
+/// Internal: analyse a file, honoring ancestor canvases' search directories.
+///
+/// Matches Pd's `canvas_path_iterate` semantics: when resolving abstraction
+/// references, Pd walks the owner chain of canvases, trying each ancestor's
+/// own directory and its `#X declare -path` entries. Thus a child abstraction
+/// with no declares of its own still resolves references via its caller's
+/// declares.
+fn analyse_file_with_ancestors(
+    file: &Path,
+    recursive: bool,
+    visited: &mut HashSet<PathBuf>,
+    ancestor_dirs: &[PathBuf],
+) -> Vec<DepEntry> {
     let canon = match file.canonicalize() {
         Ok(p) => p,
         Err(_) => file.to_path_buf(),
@@ -304,8 +325,13 @@ pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>
     };
 
     let file_dir = file.parent().unwrap_or(Path::new("."));
-    let mut search_dirs = vec![file_dir.to_path_buf()];
-    search_dirs.extend(declare_paths(file, &content));
+    let mut own_dirs = vec![file_dir.to_path_buf()];
+    own_dirs.extend(declare_paths(file, &content));
+
+    // Search order: this canvas's own dirs first, then each ancestor's dirs
+    // (in child→root order). Mirrors Pd's canvas_path_iterate loop.
+    let mut search_dirs = own_dirs.clone();
+    search_dirs.extend(ancestor_dirs.iter().cloned());
 
     let mut results = Vec::new();
 
@@ -319,15 +345,11 @@ pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>
         let depth = e.depth.saturating_sub(1);
         let class = e.class().to_string();
 
-        // Skip built-ins
         if is_builtin(&class) {
             continue;
         }
-        // Skip "pd" subpatch references (named subpatches)
-        // The class of `#X restore X Y pd name` is "restore", so Obj entries
-        // with class "pd" would be an object in the data flow, not a subpatch.
-        // We do want to track "pd" as an abstraction ref if someone writes
-        // `#X obj X Y pd` (edge case — skip).
+        // `pd` used as an object class is a subpatch reference, not an
+        // abstraction lookup on disk.
         if class == "pd" {
             continue;
         }
@@ -345,9 +367,11 @@ pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>
             found_at: found_at.clone(),
         });
 
-        // Recursive: follow found abstractions
+        // Recursive: follow found abstractions, propagating our full search
+        // chain so the child can resolve refs via our declares too.
         if recursive && let Some(ref abs_path) = location {
-            let sub_results = analyse_file(abs_path, recursive, visited);
+            let sub_results =
+                analyse_file_with_ancestors(abs_path, recursive, visited, &search_dirs);
             results.extend(sub_results);
         }
     }

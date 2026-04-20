@@ -89,6 +89,129 @@ fn deps_directory_mode_deduplicates() {
 }
 
 #[test]
+fn deps_resolves_declare_path_cross_directory() {
+    // Regression: `#X declare -path ../abs;` must strip the trailing `;`
+    // and resolve the path relative to the patch's directory.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("patches")).unwrap();
+    std::fs::create_dir_all(dir.path().join("abs")).unwrap();
+    std::fs::write(
+        dir.path().join("patches/main.pd"),
+        "#N canvas 0 22 450 300 12;\n#X declare -path ../abs;\n#X obj 50 50 util;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("abs/util.pd"),
+        "#N canvas 0 22 450 300 12;\n",
+    )
+    .unwrap();
+
+    let main = dir.path().join("patches/main.pd");
+    let out = pdtk_output(&["deps", main.to_str().unwrap()]);
+    assert!(out.contains("util"), "got: {out}");
+    assert!(
+        out.contains("found:"),
+        "declare -path was not honored: {out}"
+    );
+    assert!(!out.contains("MISSING"), "util must be resolved: {out}");
+}
+
+#[test]
+fn deps_resolves_declare_path_same_directory_subdir() {
+    // `#X declare -path subdir;` with trailing semicolon.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("subdir")).unwrap();
+    std::fs::write(
+        dir.path().join("main.pd"),
+        "#N canvas 0 22 450 300 12;\n#X declare -path subdir;\n#X obj 50 50 util;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("subdir/util.pd"),
+        "#N canvas 0 22 450 300 12;\n",
+    )
+    .unwrap();
+
+    let main = dir.path().join("main.pd");
+    let out = pdtk_output(&["deps", main.to_str().unwrap()]);
+    assert!(!out.contains("MISSING"), "util must be resolved: {out}");
+}
+
+#[test]
+fn deps_recursive_inherits_parent_declare_path() {
+    // Pd's canvas_path_iterate walks the owner chain: a child abstraction
+    // with no declares of its own still resolves references via its caller's
+    // declare -path entries. --recursive must mirror that.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("patches")).unwrap();
+    std::fs::create_dir_all(dir.path().join("abs")).unwrap();
+    // main.pd declares -path ../abs and calls `outer`
+    std::fs::write(
+        dir.path().join("patches/main.pd"),
+        "#N canvas 0 22 450 300 12;\n#X declare -path ../abs;\n#X obj 50 50 outer;\n",
+    )
+    .unwrap();
+    // outer.pd has no declares but calls `inner`, which lives next to it
+    std::fs::write(
+        dir.path().join("abs/outer.pd"),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 inner;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("abs/inner.pd"),
+        "#N canvas 0 22 450 300 12;\n",
+    )
+    .unwrap();
+
+    let main = dir.path().join("patches/main.pd");
+    let out = pdtk_output(&["deps", main.to_str().unwrap(), "--recursive"]);
+    // inner is resolved from outer.pd's own dir, but the key assertion is that
+    // outer.pd appears and its child lookup succeeds (would fail without
+    // ancestor propagation if inner lived only in a parent-declared dir).
+    assert!(out.contains("outer"));
+    assert!(out.contains("inner"));
+    assert!(
+        !out.contains("MISSING"),
+        "recursive chain must resolve: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_inherits_parent_declare_path_strict() {
+    // Strict version: `inner` lives ONLY in a directory declared by the
+    // parent, NOT next to `outer`. Without ancestor propagation this MUST
+    // fail; with it, `inner` is found.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("patches")).unwrap();
+    std::fs::create_dir_all(dir.path().join("abs")).unwrap();
+    std::fs::create_dir_all(dir.path().join("libs")).unwrap();
+    std::fs::write(
+        dir.path().join("patches/main.pd"),
+        "#N canvas 0 22 450 300 12;\n#X declare -path ../abs -path ../libs;\n#X obj 50 50 outer;\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("abs/outer.pd"),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 inner;\n",
+    )
+    .unwrap();
+    // inner lives in libs/, reachable only via main.pd's declare
+    std::fs::write(
+        dir.path().join("libs/inner.pd"),
+        "#N canvas 0 22 450 300 12;\n",
+    )
+    .unwrap();
+
+    let main = dir.path().join("patches/main.pd");
+    let out = pdtk_output(&["deps", main.to_str().unwrap(), "--recursive"]);
+    assert!(out.contains("inner"));
+    assert!(
+        !out.contains("MISSING"),
+        "parent declares must propagate: {out}"
+    );
+}
+
+#[test]
 fn deps_json_output_schema() {
     let f = abs_dir().join("uses_abstractions.pd");
     let out = pdtk_output(&["deps", f.to_str().unwrap(), "--json"]);

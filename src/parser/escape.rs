@@ -136,6 +136,8 @@ mod tests {
     #[test]
     fn detects_unescaped_semicolon_in_body_only() {
         assert!(has_unescaped_semicolon_in_body("#X msg 10 10 foo ; bar;"));
-        assert!(!has_unescaped_semicolon_in_body(r"#X msg 10 10 foo \; bar;"));
+        assert!(!has_unescaped_semicolon_in_body(
+            r"#X msg 10 10 foo \; bar;"
+        ));
     }
 }
