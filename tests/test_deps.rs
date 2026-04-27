@@ -222,3 +222,120 @@ fn deps_json_output_schema() {
     assert!(row.get("name").is_some());
     assert!(row.get("found").is_some());
 }
+
+// =====================================================================
+// P5: --search-path and --pd-path
+// =====================================================================
+
+#[test]
+fn deps_extra_search_path_resolves() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("main.pd"),
+        "#N canvas 0 22 450 300 12;\n#X obj 50 50 util;\n",
+    )
+    .unwrap();
+    let extra = dir.path().join("libs");
+    std::fs::create_dir(&extra).unwrap();
+    std::fs::write(extra.join("util.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+
+    let main = dir.path().join("main.pd");
+    let out = pdtk_output(&[
+        "deps",
+        main.to_str().unwrap(),
+        "--search-path",
+        extra.to_str().unwrap(),
+    ]);
+    assert!(out.contains("util"), "{out}");
+    assert!(!out.contains("MISSING"), "{out}");
+}
+
+#[test]
+fn deps_extra_search_path_after_declare() {
+    // Declare path takes priority over --search-path. Same file in both
+    // dirs: result must point at the declare-path version.
+    let dir = tempfile::tempdir().unwrap();
+    let declared = dir.path().join("declared");
+    let extra = dir.path().join("extra");
+    std::fs::create_dir(&declared).unwrap();
+    std::fs::create_dir(&extra).unwrap();
+    std::fs::write(
+        dir.path().join("main.pd"),
+        "#N canvas 0 22 450 300 12;\n\
+#X declare -path declared;\n\
+#X obj 50 50 thing;\n",
+    )
+    .unwrap();
+    std::fs::write(declared.join("thing.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+    std::fs::write(extra.join("thing.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+
+    let main = dir.path().join("main.pd");
+    let out = pdtk_output(&[
+        "deps",
+        main.to_str().unwrap(),
+        "--search-path",
+        extra.to_str().unwrap(),
+    ]);
+    assert!(
+        out.contains("declared/thing.pd"),
+        "declare path should take priority: {out}"
+    );
+}
+
+#[test]
+fn deps_pd_path_flag_accepted() {
+    // Just verify the flag doesn't crash; platform paths may not exist on CI.
+    let f = abs_dir().join("uses_abstractions.pd");
+    let out = run_pdtk(&["deps", f.to_str().unwrap(), "--pd-path"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout_string(&out).contains("used_abs"));
+}
+
+#[test]
+fn deps_pd_path_resolves_via_synthetic_home() {
+    // Place foo.pd under a synthetic HOME's .local/lib/pd/extra and verify
+    // --pd-path picks it up (Linux only — macOS uses different layout).
+    if !cfg!(target_os = "linux") {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let home = dir.path();
+    let extra = home.join(".local/lib/pd/extra");
+    std::fs::create_dir_all(&extra).unwrap();
+    std::fs::write(extra.join("foo.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+
+    let main = home.join("main.pd");
+    std::fs::write(&main, "#N canvas 0 22 450 300 12;\n#X obj 50 50 foo;\n").unwrap();
+
+    let out = assert_cmd::Command::cargo_bin("pdtk")
+        .unwrap()
+        .env("HOME", home)
+        .args(["deps", main.to_str().unwrap(), "--pd-path"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !s.contains("MISSING"),
+        "foo.pd should resolve via synthetic HOME:\n{s}"
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn pd_platform_paths_linux_with_synthetic_home() {
+    // Spawn pdtk with --pd-path and a synthetic HOME that contains the
+    // user-local extra dir; just check the flag is accepted and the binary
+    // does not crash with that HOME. Pure-function testing of
+    // pd_platform_paths happens in lib via its own unit tests if wanted;
+    // here we just exercise the integration.
+    let dir = tempfile::tempdir().unwrap();
+    let f = abs_dir().join("uses_abstractions.pd");
+    let out = assert_cmd::Command::cargo_bin("pdtk")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["deps", f.to_str().unwrap(), "--pd-path"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+}

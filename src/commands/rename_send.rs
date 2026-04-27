@@ -72,7 +72,7 @@ fn replace_raw_token(
 fn simple_sr_class(class: &str) -> bool {
     matches!(
         class,
-        "s" | "send" | "r" | "receive" | "s~" | "r~" | "throw~" | "catch~"
+        "s" | "send" | "r" | "receive" | "s~" | "send~" | "r~" | "receive~" | "throw~" | "catch~"
     )
 }
 

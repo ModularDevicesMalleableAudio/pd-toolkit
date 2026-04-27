@@ -92,11 +92,20 @@ fn main() {
             file,
             depth,
             index,
+            subpatch,
             in_place,
             backup,
             output,
         }) => {
-            match commands::delete::run(&file, depth, index, in_place, backup, output.as_deref()) {
+            match commands::delete::run(
+                &file,
+                depth,
+                index,
+                subpatch,
+                in_place,
+                backup,
+                output.as_deref(),
+            ) {
                 Ok((serialized, code)) => {
                     if !in_place && output.is_none() {
                         print!("{serialized}");
@@ -398,7 +407,13 @@ fn main() {
                 }
             }
         }
-        Some(Commands::Lint { file, json }) => match commands::lint::run(&file, json) {
+        Some(Commands::Lint {
+            file,
+            json,
+            send_receive,
+            fan_out,
+            dsp_loop,
+        }) => match commands::lint::run(&file, json, send_receive, fan_out, dsp_loop) {
             Ok(result) => {
                 if !result.output.is_empty() {
                     println!("{}", result.output);
@@ -486,7 +501,9 @@ fn main() {
             recursive,
             missing,
             json,
-        }) => match commands::deps::run(&target, recursive, missing, json) {
+            search_path,
+            pd_path,
+        }) => match commands::deps::run(&target, recursive, missing, json, &search_path, pd_path) {
             Ok(out) => {
                 if !out.is_empty() {
                     println!("{out}");

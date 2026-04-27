@@ -25,7 +25,13 @@ pub struct LintResult {
     pub exit_code: i32,
 }
 
-pub fn run(file: &str, json: bool) -> Result<LintResult, PdtkError> {
+pub fn run(
+    file: &str,
+    json: bool,
+    send_receive: bool,
+    fan_out: bool,
+    dsp_loop: bool,
+) -> Result<LintResult, PdtkError> {
     let input = io::read_patch_file(file)?;
     let patch = parse(&input)?;
 
@@ -156,6 +162,16 @@ pub fn run(file: &str, json: bool) -> Result<LintResult, PdtkError> {
         let _ = (recomputed, actual_groups); // used for potential future checks
     }
 
+    if send_receive {
+        run_send_receive_lint(&patch, &mut style);
+    }
+    if fan_out {
+        run_fan_out_lint(&patch, &mut style);
+    }
+    if dsp_loop {
+        run_dsp_loop_lint(&patch, &mut style);
+    }
+
     let valid = errors.is_empty();
     let exit_code = if valid { 0 } else { 1 };
 
@@ -193,4 +209,138 @@ pub fn run(file: &str, json: bool) -> Result<LintResult, PdtkError> {
         output: out.trim_end().to_string(),
         exit_code,
     })
+}
+
+fn run_send_receive_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
+    use pd_toolkit::analysis::send_receive::{collect_receives, collect_sends, format_locations};
+    let sends = collect_sends(&patch.entries);
+    let receives = collect_receives(&patch.entries);
+
+    for (name, locs) in &sends {
+        if !receives.contains_key(name) {
+            style.push(format!(
+                "orphan send: '{name}' at {} — no matching receive",
+                format_locations(locs)
+            ));
+        }
+    }
+    for (name, locs) in &receives {
+        if !sends.contains_key(name) {
+            style.push(format!(
+                "dead receive: '{name}' at {} — no matching send",
+                format_locations(locs)
+            ));
+        }
+    }
+    for (name, locs) in &receives {
+        if locs.len() > 1 {
+            style.push(format!(
+                "broadcast receive: '{name}' has {} receivers at {}",
+                locs.len(),
+                format_locations(locs)
+            ));
+        }
+    }
+}
+
+fn run_fan_out_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
+    use std::collections::HashMap;
+    // For each depth, group connections by (src, src_outlet) and report
+    // groups of >= 2 destinations whose source is non-signal.
+    let max_depth = patch.max_depth();
+    for d in 0..=max_depth {
+        let internal = d + 1;
+        let mut groups: HashMap<(usize, usize), usize> = HashMap::new();
+        for e in &patch.entries {
+            if e.kind != EntryKind::Connect || e.depth != internal {
+                continue;
+            }
+            if let Some(c) = Connection::parse(&e.raw) {
+                *groups.entry((c.src, c.src_outlet)).or_insert(0) += 1;
+            }
+        }
+        // Look up source entries by (depth, object_index)
+        let mut src_class: HashMap<usize, (EntryKind, String)> = HashMap::new();
+        for e in &patch.entries {
+            if e.depth == internal
+                && let Some(idx) = e.object_index
+            {
+                src_class.insert(idx, (e.kind.clone(), e.class().to_string()));
+            }
+        }
+        let mut sorted: Vec<((usize, usize), usize)> =
+            groups.into_iter().filter(|(_, c)| *c > 1).collect();
+        sorted.sort();
+        for ((src, outlet), count) in sorted {
+            if let Some((kind, class)) = src_class.get(&src)
+                && *kind == EntryKind::Obj
+                && class.ends_with('~')
+            {
+                continue; // signal-rate fan-out is fine
+            }
+            style.push(format!(
+                "fan-out: depth {d}, obj {src} outlet {outlet} connects to {count} destinations — consider [trigger]"
+            ));
+        }
+    }
+}
+
+fn run_dsp_loop_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
+    use petgraph::algo::tarjan_scc;
+    use petgraph::graph::{DiGraph, NodeIndex};
+    use std::collections::HashMap;
+
+    let max_depth = patch.max_depth();
+    for d in 0..=max_depth {
+        let internal = d + 1;
+        // Collect signal objects at this depth
+        let mut signal_objs: HashMap<usize, String> = HashMap::new();
+        for e in &patch.entries {
+            if e.depth == internal
+                && e.kind == EntryKind::Obj
+                && let Some(idx) = e.object_index
+            {
+                let class = e.class().to_string();
+                if class.ends_with('~') {
+                    signal_objs.insert(idx, class);
+                }
+            }
+        }
+        if signal_objs.is_empty() {
+            continue;
+        }
+        let mut g: DiGraph<usize, ()> = DiGraph::new();
+        let mut node_for: HashMap<usize, NodeIndex> = HashMap::new();
+        for &idx in signal_objs.keys() {
+            let n = g.add_node(idx);
+            node_for.insert(idx, n);
+        }
+        for e in &patch.entries {
+            if e.kind != EntryKind::Connect || e.depth != internal {
+                continue;
+            }
+            if let Some(c) = Connection::parse(&e.raw)
+                && let (Some(&src), Some(&dst)) = (node_for.get(&c.src), node_for.get(&c.dst))
+            {
+                g.add_edge(src, dst, ());
+            }
+        }
+        for scc in tarjan_scc(&g) {
+            let is_cycle =
+                scc.len() > 1 || (scc.len() == 1 && g.find_edge(scc[0], scc[0]).is_some());
+            if !is_cycle {
+                continue;
+            }
+            let mut indices: Vec<usize> = scc.iter().map(|n| *g.node_weight(*n).unwrap()).collect();
+            indices.sort();
+            let list = indices
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            style.push(format!(
+                "dsp-loop: depth {d}, cycle involving objects {list}"
+            ));
+        }
+    }
 }

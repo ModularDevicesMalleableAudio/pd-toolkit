@@ -26,6 +26,9 @@ Object indices are annotated in comments where relevant.
 | `float_vs_width.pd` | `f` class vs `, f N` | 5 | 5 | Disambiguation |
 | `all_gui_types.pd` | tgl/bng/nbx/etc | 12 | 9 | GUI send/receive fields |
 | `send_receive.pd` | s/r, s~/r~, throw~/catch~ | 9 | 5 | Send/receive pairs |
+| `send_receive_lint.pd` | Lint --send-receive | 7 | 0 | Orphan send, dead receive, matched pair, GUI send, s~/r~ |
+| `fan_out_lint.pd` | Lint --fan-out | 6 | 4 | Control fan-out from bng (warn); signal fan-out from osc~ (no warn) |
+| `dsp_loop_lint.pd` | Lint --dsp-loop | 7 | 6 | Signal cycle, linear chain, control cycle (no warn) |
 | `arrays.pd` | Array definitions | 5 | 2 | Array inventory |
 | `orphans.pd` | Unconnected objects | 5 | 1 | Orphan detection |
 | `displays.pd` | Connected debug displays | 7 | 4 | Display finder |

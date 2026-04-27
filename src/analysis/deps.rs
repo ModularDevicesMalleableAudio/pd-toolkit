@@ -24,7 +24,9 @@ const BUILTIN_NAMES: &[&str] = &[
     "receive",
     "r",
     "s~",
+    "send~",
     "r~",
+    "receive~",
     "throw~",
     "catch~",
     "trigger",
@@ -293,7 +295,18 @@ fn locate_abstraction(name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
 /// Analyse one file and collect dependency entries.
 /// `visited` prevents re-processing the same file in recursive mode.
 pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>) -> Vec<DepEntry> {
-    analyse_file_with_ancestors(file, recursive, visited, &[])
+    analyse_file_with_ancestors(file, recursive, visited, &[], &[])
+}
+
+/// Like `analyse_file`, but also searches `extra_dirs` as a fallback after
+/// the patch's own directory and `#X declare -path` entries.
+pub fn analyse_file_with_extra(
+    file: &Path,
+    recursive: bool,
+    visited: &mut HashSet<PathBuf>,
+    extra_dirs: &[PathBuf],
+) -> Vec<DepEntry> {
+    analyse_file_with_ancestors(file, recursive, visited, &[], extra_dirs)
 }
 
 /// Internal: analyse a file, honoring ancestor canvases' search directories.
@@ -308,6 +321,7 @@ fn analyse_file_with_ancestors(
     recursive: bool,
     visited: &mut HashSet<PathBuf>,
     ancestor_dirs: &[PathBuf],
+    extra_dirs: &[PathBuf],
 ) -> Vec<DepEntry> {
     let canon = match file.canonicalize() {
         Ok(p) => p,
@@ -332,6 +346,7 @@ fn analyse_file_with_ancestors(
     // (in child→root order). Mirrors Pd's canvas_path_iterate loop.
     let mut search_dirs = own_dirs.clone();
     search_dirs.extend(ancestor_dirs.iter().cloned());
+    search_dirs.extend(extra_dirs.iter().cloned());
 
     let mut results = Vec::new();
 
@@ -371,7 +386,7 @@ fn analyse_file_with_ancestors(
         // chain so the child can resolve refs via our declares too.
         if recursive && let Some(ref abs_path) = location {
             let sub_results =
-                analyse_file_with_ancestors(abs_path, recursive, visited, &search_dirs);
+                analyse_file_with_ancestors(abs_path, recursive, visited, &search_dirs, extra_dirs);
             results.extend(sub_results);
         }
     }

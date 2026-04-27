@@ -265,5 +265,29 @@
   "handcrafted/malformed_bad_connection.pd": {
     "should_fail_validation": true,
     "_note": "connect 0 0 5 0 references index 5 but only 2 objects exist"
+  },
+
+  "handcrafted/send_receive_lint.pd": {
+    "depth_0_objects": 7,
+    "depth_0_connections": 0,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "_note": "Fixture for lint --send-receive: orphan send, dead receive, matched pair, gui send, signal s~/r~ pair"
+  },
+
+  "handcrafted/fan_out_lint.pd": {
+    "depth_0_objects": 6,
+    "depth_0_connections": 4,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "_note": "Fixture for lint --fan-out: bng (control) fans out to two prints; osc~ (signal) fans out to two *~ (must not warn)"
+  },
+
+  "handcrafted/dsp_loop_lint.pd": {
+    "depth_0_objects": 7,
+    "depth_0_connections": 6,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "_note": "Fixture for lint --dsp-loop: signal cycle osc~ <-> *~, linear chain phasor~->*~->dac~, control cycle f<->+ (must not flag)"
   }
 }

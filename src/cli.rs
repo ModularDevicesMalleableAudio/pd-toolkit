@@ -157,6 +157,21 @@ pub enum Commands {
         /// Output results as JSON (errors, warnings, and style fields)
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+        /// Cross-reference sends and receives; report orphans, dead receives, and broadcasts
+        #[arg(long, help = "Cross-reference sends and receives")]
+        send_receive: bool,
+        /// Warn about message-order-dependent control fan-outs (consider [trigger])
+        #[arg(
+            long,
+            help = "Warn about control fan-outs without [trigger]. Heuristic: skips sources whose class ends in ~. Mixed-rate tilde objects (snapshot~ etc.) may be false negatives."
+        )]
+        fan_out: bool,
+        /// Detect static DSP feedback cycles in the signal connection graph
+        #[arg(
+            long,
+            help = "Detect signal-graph feedback cycles. Limitations: per-canvas only (no inlet~/outlet~ crossing); does not see through abstractions, pd~, or clone."
+        )]
+        dsp_loop: bool,
     },
 
     /// Patch complexity metrics
@@ -400,6 +415,16 @@ pub enum Commands {
         /// Output results as JSON
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+        /// Additional directory to search for abstractions (repeatable). Used as a fallback after the patch's own dirs and #X declare paths.
+        #[arg(
+            long = "search-path",
+            value_name = "DIR",
+            help = "Additional search directory (repeatable, fallback)"
+        )]
+        search_path: Vec<String>,
+        /// Append best-effort common Pd external locations for the host platform (Linux / macOS). Best-effort fallback, not a reproduction of Pd's exact resolution.
+        #[arg(long = "pd-path", help = "Append common Pd external locations")]
+        pd_path: bool,
     },
 
     // Editing
@@ -450,8 +475,18 @@ pub enum Commands {
         #[arg(long, help = "Depth of the object (0 = top-level)")]
         depth: usize,
         /// Index of the object to delete (0-based)
-        #[arg(long, help = "Object index to delete (0-based)")]
-        index: usize,
+        #[arg(
+            long,
+            help = "Object index to delete (0-based; required unless --subpatch)",
+            required_unless_present = "subpatch"
+        )]
+        index: Option<usize>,
+        /// Delete an entire subpatch identified by its canvas depth
+        #[arg(
+            long,
+            help = "Delete a subpatch: --depth is the subpatch's canvas depth, --index selects the Nth subpatch (default 0)"
+        )]
+        subpatch: bool,
         /// Overwrite the original file
         #[arg(long, help = "Write changes back to the original file")]
         in_place: bool,

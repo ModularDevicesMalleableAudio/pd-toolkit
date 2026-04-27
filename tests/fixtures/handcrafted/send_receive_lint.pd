@@ -1,0 +1,8 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 s orphan_send;
+#X obj 50 80 r dead_receive;
+#X obj 50 110 s matched;
+#X obj 50 140 r matched;
+#X obj 50 170 tgl 15 0 gui_send empty 0 0 0 17 -262144 -1 -1 0 1;
+#X obj 50 200 send~ sig_a;
+#X obj 50 230 receive~ sig_a;
