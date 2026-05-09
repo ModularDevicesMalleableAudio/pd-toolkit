@@ -1,0 +1,319 @@
+array define -k -yrange 0 128 seq_channel_colours 16
+array define -k -yrange 0 64 notes_\$1_1 16
+array define -k -yrange 0 64 notes_\$1_2 16
+array define -k -yrange 0 64 notes_\$1_3 16
+array define -k -yrange 0 64 notes_\$1_4 16
+array define -k -yrange 0 64 notes_\$1_5 16
+array define -k -yrange 0 64 notes_\$1_6 16
+array define -k -yrange 0 64 notes_\$1_7 16
+array define -k -yrange 0 64 notes_\$1_8 16
+array define -k chord_prog_rate 16
+array define -yrange 0 100 random_\$1_1 16
+array define -yrange 0 100 random_\$1_2 16
+array define -yrange 0 100 random_\$1_3 16
+array define -yrange 0 100 random_\$1_4 16
+array define -yrange 0 100 random_\$1_5 16
+array define -yrange 0 100 random_\$1_6 16
+array define -yrange 0 100 random_\$1_7 16
+array define -yrange 0 100 random_\$1_8 16
+array define -yrange 0 127 topbar_fe_1 16
+array define -yrange 0 127 topbar_fe_2 16
+array define -yrange 0 127 velo_out_\$1_1 16
+array define -yrange 0 127 velo_out_\$1_2 16
+array define -yrange 0 127 velo_out_\$1_3 16
+array define -yrange 0 127 velo_out_\$1_4 16
+array define -yrange 0 127 velo_out_\$1_5 16
+array define -yrange 0 127 velo_out_\$1_6 16
+array define -yrange 0 127 velo_out_\$1_7 16
+array define -yrange 0 127 velo_out_\$1_8 16
+array define -yrange 0 17 trig_sus_\$1_1 2
+array define -yrange 0 17 trig_sus_\$1_2 2
+array define -yrange 0 17 trig_sus_\$1_3 2
+array define -yrange 0 17 trig_sus_\$1_4 2
+array define -yrange 0 17 trig_sus_\$1_5 2
+array define -yrange 0 17 trig_sus_\$1_6 2
+array define -yrange 0 17 trig_sus_\$1_7 2
+array define -yrange 0 17 trig_sus_\$1_8 2
+array define -yrange 0 20 trig_out_\$1_1 16
+array define -yrange 0 20 trig_out_\$1_2 16
+array define -yrange 0 20 trig_out_\$1_3 16
+array define -yrange 0 20 trig_out_\$1_4 16
+array define -yrange 0 20 trig_out_\$1_5 16
+array define -yrange 0 20 trig_out_\$1_6 16
+array define -yrange 0 20 trig_out_\$1_7 16
+array define -yrange 0 20 trig_status_\$1_1 16
+array define -yrange 0 20 trig_status_\$1_2 16
+array define -yrange 0 20 trig_status_\$1_3 16
+array define -yrange 0 20 trig_status_\$1_4 16
+array define -yrange 0 20 trig_status_\$1_5 16
+array define -yrange 0 20 trig_status_\$1_6 16
+array define -yrange 0 20 trig_status_\$1_7 16
+array define -yrange 0 20 trig_status_\$1_8 16
+array define -yrange 0 2000 duty_out_\$1_1 16
+array define -yrange 0 2000 duty_out_\$1_2 16
+array define -yrange 0 2000 duty_out_\$1_3 16
+array define -yrange 0 2000 duty_out_\$1_4 16
+array define -yrange 0 2000 duty_out_\$1_5 16
+array define -yrange 0 2000 duty_out_\$1_6 16
+array define -yrange 0 2000 duty_out_\$1_7 16
+array define -yrange 0 2000 duty_out_\$1_8 16
+array define -yrange 0 24 mute_status_1 8
+array define -yrange 0 24 mute_status_10 8
+array define -yrange 0 24 mute_status_11 8
+array define -yrange 0 24 mute_status_12 8
+array define -yrange 0 24 mute_status_13 8
+array define -yrange 0 24 mute_status_13.alt 8
+array define -yrange 0 24 mute_status_14 8
+array define -yrange 0 24 mute_status_15 8
+array define -yrange 0 24 mute_status_2 8
+array define -yrange 0 24 mute_status_3 8
+array define -yrange 0 24 mute_status_4 8
+array define -yrange 0 24 mute_status_5 8
+array define -yrange 0 24 mute_status_6 8
+array define -yrange 0 24 mute_status_7 8
+array define -yrange 0 24 mute_status_9 8
+array define \$1_row_octaves 8
+array define \$1arplight_A 8
+array define \$1arplight_B 8
+array define \$1arplight_C 8
+array define \$1arplight_D 8
+array define \$1arplight_E 8
+array define \$1arplight_F 8
+array define \$1arplight_G 8
+array define \$1arplight_H 8
+array define cc11_t11_arp_1 8
+array define cc11_t11_arp_2 8
+array define cc11_t11_arp_3 8
+array define cc11_t11_arp_4 8
+array define cc11_t11_arp_5 8
+array define cc11_t11_arp_6 8
+array define cc11_t11_arp_7 8
+array define cc11_t11_arp_8 8
+array define cc11_t11_arp_position 8
+array define cc11_t11_arplength_array 8
+array define cc12_t12_arp_1 8
+array define cc12_t12_arp_2 8
+array define cc12_t12_arp_3 8
+array define cc12_t12_arp_4 8
+array define cc12_t12_arp_5 8
+array define cc12_t12_arp_6 8
+array define cc12_t12_arp_7 8
+array define cc12_t12_arp_8 8
+array define cc12_t12_arp_position 8
+array define cc12_t12_arplength_array 8
+array define cc13_alt13A_arp_8 8
+array define cc13_alt13A_arp_position 8
+array define cc13_alt13A_arplength_array 8
+array define cc13_alt13B_arp_7 8
+array define cc13_alt13B_arp_position 8
+array define cc13_alt13B_arplength_array 8
+array define cc13_alt13C_arp_6 8
+array define cc13_alt13C_arp_position 8
+array define cc13_alt13C_arplength_array 8
+array define cc13_alt13D_arp_5 8
+array define cc13_alt13D_arp_position 8
+array define cc13_alt13D_arplength_array 8
+array define cc13_alt13HC_arp_3 8
+array define cc13_alt13HC_arp_4 8
+array define cc13_alt13HC_arp_position 8
+array define cc13_alt13HC_arplength_array 8
+array define cc13_alt13RS_arp_1 8
+array define cc13_alt13RS_arp_2 8
+array define cc13_alt13RS_arp_position 8
+array define cc13_alt13RS_arplength_array 8
+array define cc13_t13A_arp_8 8
+array define cc13_t13A_arp_position 8
+array define cc13_t13A_arplength_array 8
+array define cc13_t13BD_arp_1 8
+array define cc13_t13BD_arp_2 8
+array define cc13_t13BD_arp_3 8
+array define cc13_t13BD_arp_position 8
+array define cc13_t13BD_arplength_array 8
+array define cc13_t13B_arp_7 8
+array define cc13_t13B_arp_position 8
+array define cc13_t13B_arplength_array 8
+array define cc13_t13C_arp_6 8
+array define cc13_t13C_arp_position 8
+array define cc13_t13C_arplength_array 8
+array define cc13_t13SD_arp_4 8
+array define cc13_t13SD_arp_5 8
+array define cc13_t13SD_arp_position 8
+array define cc13_t13SD_arplength_array 8
+array define cc2_t2_arp_1 8
+array define cc2_t2_arp_2 8
+array define cc2_t2_arp_3 8
+array define cc2_t2_arp_4 8
+array define cc2_t2_arp_5 8
+array define cc2_t2_arp_6 8
+array define cc2_t2_arp_7 8
+array define cc2_t2_arp_8 8
+array define cc2_t2_arp_position 8
+array define cc2_t2_arplength_array 8
+array define cc3_t3_arp_1 8
+array define cc3_t3_arp_2 8
+array define cc3_t3_arp_3 8
+array define cc3_t3_arp_4 8
+array define cc3_t3_arp_5 8
+array define cc3_t3_arp_6 8
+array define cc3_t3_arp_7 8
+array define cc3_t3_arp_8 8
+array define cc3_t3_arp_position 8
+array define cc3_t3_arplength_array 8
+array define cc6_t6_arp_1 8
+array define cc6_t6_arp_2 8
+array define cc6_t6_arp_3 8
+array define cc6_t6_arp_4 8
+array define cc6_t6_arp_5 8
+array define cc6_t6_arp_6 8
+array define cc6_t6_arp_7 8
+array define cc6_t6_arp_8 8
+array define cc6_t6_arp_position 8
+array define cc6_t6_arplength_array 8
+array define cc9_t9_arp_1 8
+array define cc9_t9_arp_2 8
+array define cc9_t9_arp_3 8
+array define cc9_t9_arp_4 8
+array define cc9_t9_arp_5 8
+array define cc9_t9_arp_6 8
+array define cc9_t9_arp_7 8
+array define cc9_t9_arp_8 8
+array define cc9_t9_arp_position 8
+array define cc9_t9_arplength_array 8
+array define cc\$1_v\$3_selected_arp_row 2
+array define cc_out_11_1 16
+array define cc_out_11_2 16
+array define cc_out_11_3 16
+array define cc_out_11_4 16
+array define cc_out_11_5 16
+array define cc_out_11_6 16
+array define cc_out_11_7 16
+array define cc_out_11_8 16
+array define cc_out_12_1 16
+array define cc_out_12_2 16
+array define cc_out_12_3 16
+array define cc_out_12_4 16
+array define cc_out_12_5 16
+array define cc_out_12_6 16
+array define cc_out_12_7 16
+array define cc_out_12_8 16
+array define cc_out_13.alt_1 16
+array define cc_out_13.alt_2 16
+array define cc_out_13.alt_3 16
+array define cc_out_13.alt_4 16
+array define cc_out_13.alt_5 16
+array define cc_out_13.alt_6 16
+array define cc_out_13.alt_7 16
+array define cc_out_13.alt_8 16
+array define cc_out_13_1 16
+array define cc_out_13_2 16
+array define cc_out_13_3 16
+array define cc_out_13_4 16
+array define cc_out_13_5 16
+array define cc_out_13_6 16
+array define cc_out_13_7 16
+array define cc_out_13_8 16
+array define cc_out_2_1 16
+array define cc_out_2_2 16
+array define cc_out_2_3 16
+array define cc_out_2_4 16
+array define cc_out_2_5 16
+array define cc_out_2_6 16
+array define cc_out_2_7 16
+array define cc_out_2_8 16
+array define cc_out_3_1 16
+array define cc_out_3_2 16
+array define cc_out_3_3 16
+array define cc_out_3_4 16
+array define cc_out_3_5 16
+array define cc_out_3_6 16
+array define cc_out_3_7 16
+array define cc_out_3_8 16
+array define cc_out_6_1 16
+array define cc_out_6_2 16
+array define cc_out_6_3 16
+array define cc_out_6_4 16
+array define cc_out_6_5 16
+array define cc_out_6_6 16
+array define cc_out_6_7 16
+array define cc_out_6_8 16
+array define cc_out_9_1 16
+array define cc_out_9_2 16
+array define cc_out_9_3 16
+array define cc_out_9_4 16
+array define cc_out_9_5 16
+array define cc_out_9_6 16
+array define cc_out_9_7 16
+array define cc_out_9_8 16
+array define cc_slew_tau 16
+array define cc_slew_toggle 16
+array define euclid_trig_\$1_1 16
+array define euclid_trig_\$1_2 16
+array define euclid_trig_\$1_3 16
+array define euclid_trig_\$1_4 16
+array define euclid_trig_\$1_5 16
+array define euclid_trig_\$1_6 16
+array define euclid_trig_\$1_7 16
+array define euclid_trig_\$1_8 16
+array define euclid_trig_density_\$1 8
+array define euclid_trig_length_\$1 8
+array define euclid_trig_rotation_\$1 8
+array define euclid_trig_sel_row_\$1 1
+array define euclid_trig_status_\$1 8
+array define input_generation 1
+array define lc_knob_1_leds 16
+array define lc_knob_2_leds 16
+array define lc_knob_3_leds 16
+array define s\$1_duty_arp_position 8
+array define s\$1_jam_kbd_gate 128
+array define s\$1_jam_kbd_trig_status 16
+array define s\$1_ro_0 8
+array define s\$1_ro_1 8
+array define s\$1_ro_2 8
+array define s\$1_ro_3 8
+array define s\$1_ro_4 8
+array define s\$1_ro_5 8
+array define s\$1_ro_6 8
+array define s\$1_ro_7 8
+array define s\$1_selected_duty_arp_row 8
+array define s\$1_selected_note_arp_row 8
+array define s\$1_selected_note_arp_step 8
+array define s\$1_selected_velo_arp_row 8
+array define s\$1_velo_arp_position 8
+array define synth\$1_duty_arp_A 8
+array define synth\$1_duty_arp_B 8
+array define synth\$1_duty_arp_C 8
+array define synth\$1_duty_arp_D 8
+array define synth\$1_duty_arp_E 8
+array define synth\$1_duty_arp_F 8
+array define synth\$1_duty_arp_G 8
+array define synth\$1_duty_arp_H 8
+array define synth\$1_duty_arplength_array 8
+array define synth\$1_velo_arp_A 8
+array define synth\$1_velo_arp_B 8
+array define synth\$1_velo_arp_C 8
+array define synth\$1_velo_arp_D 8
+array define synth\$1_velo_arp_E 8
+array define synth\$1_velo_arp_F 8
+array define synth\$1_velo_arp_G 8
+array define synth\$1_velo_arp_H 8
+array define synth\$1_velo_arplength_array 8
+array define tr8_velo_arp_A 8
+array define tr8_velo_arp_A_alt 8
+array define tr8_velo_arp_B 8
+array define tr8_velo_arp_B_alt 8
+array define tr8_velo_arp_C 8
+array define tr8_velo_arp_C_alt 8
+array define tr8_velo_arp_D 8
+array define tr8_velo_arp_D_alt 8
+array define tr8_velo_arp_E 8
+array define tr8_velo_arp_E_alt 8
+array define tr8_velo_arp_F 8
+array define tr8_velo_arp_F_alt 8
+array define tr8_velo_arp_G 8
+array define tr8_velo_arp_G_alt 8
+array define tr8_velo_arp_H 8
+array define tr8_velo_arp_H_alt 8
+array define tr8_velo_arp_position 8
+array define tr8_velo_arp_position_alt 8
+array define tr8_velo_arplength_array 8
+array define tr8_velo_arplength_array_alt 8

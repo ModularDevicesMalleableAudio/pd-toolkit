@@ -234,18 +234,44 @@ fn main() {
                 e.exit_code()
             }
         },
-        Some(Commands::Arrays { target, json }) => match commands::arrays::run(&target, json) {
-            Ok(out) => {
-                if !out.is_empty() {
-                    println!("{out}");
+        Some(Commands::Arrays {
+            target,
+            json,
+            kind,
+            templates,
+            schema,
+        }) => {
+            let cfg = commands::arrays::ArraysConfig {
+                schema: match schema.as_str() {
+                    "1" => commands::arrays::Schema::V1,
+                    _ => commands::arrays::Schema::V2,
+                },
+                kind: kind.as_deref().map(|k| match k {
+                    "classic" => commands::arrays::KindFilter::Classic,
+                    "define" => commands::arrays::KindFilter::Define,
+                    _ => commands::arrays::KindFilter::All,
+                }),
+                templates: match templates.as_str() {
+                    "exclude" => commands::arrays::TemplateFilter::Exclude,
+                    "only" => commands::arrays::TemplateFilter::Only,
+                    _ => commands::arrays::TemplateFilter::Include,
+                },
+                json,
+                verbose,
+            };
+            match commands::arrays::run(&target, cfg) {
+                Ok(out) => {
+                    if !out.is_empty() {
+                        println!("{out}");
+                    }
+                    0
                 }
-                0
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
             }
-            Err(e) => {
-                eprintln!("{e}");
-                e.exit_code()
-            }
-        },
+        }
         Some(Commands::Stats { target, json }) => match commands::stats::run(&target, json) {
             Ok(out) => {
                 if !out.is_empty() {

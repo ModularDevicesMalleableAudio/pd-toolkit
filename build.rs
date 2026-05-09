@@ -112,7 +112,27 @@ fn build_root_command() -> clap::Command {
             Command::new("arrays")
                 .about("List all PD arrays defined in patches")
                 .arg(Arg::new("target").required(true))
-                .arg(Arg::new("json").long("json").num_args(0)),
+                .arg(Arg::new("json").long("json").num_args(0))
+                .arg(
+                    Arg::new("kind")
+                        .long("kind")
+                        .value_name("KIND")
+                        .value_parser(["classic", "define", "all"]),
+                )
+                .arg(
+                    Arg::new("templates")
+                        .long("templates")
+                        .value_name("MODE")
+                        .value_parser(["include", "exclude", "only"])
+                        .default_value("include"),
+                )
+                .arg(
+                    Arg::new("schema")
+                        .long("schema")
+                        .value_name("N")
+                        .value_parser(["1", "2"])
+                        .default_value("2"),
+                ),
         )
         .subcommand(
             Command::new("search")

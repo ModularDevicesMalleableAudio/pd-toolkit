@@ -545,6 +545,13 @@ fi
 if [ "$RUN_CORPUS" -eq 1 ]; then
     test_corpus_structural
     test_corpus_round_trip_ready
+    if [ -x "$SCRIPT_DIR/check_corpus_drift.sh" ]; then
+        if "$SCRIPT_DIR/check_corpus_drift.sh" >/dev/null; then
+            pass "corpus drift check (array-define.txt vs array_define_real.pd)"
+        else
+            fail "corpus drift check" "first 319 rows of array_define_real.pd diverge from array-define.txt"
+        fi
+    fi
 fi
 
 test_fixture_coverage

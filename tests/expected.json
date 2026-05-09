@@ -289,5 +289,84 @@
     "max_depth": 0,
     "canvas_count": 1,
     "_note": "Fixture for lint --dsp-loop: signal cycle osc~ <-> *~, linear chain phasor~->*~->dac~, control cycle f<->+ (must not flag)"
+  },
+
+  "handcrafted/classic_array_save_flags.pd": {
+    "_note": "Exercises classic K save_flag bitfield: K=0 default, K=3 saveit+points, K=9 saveit+hidename, K=abc malformed.",
+    "arrays_classic": [
+      {"name": "nosave_default", "size": 4, "save_flag": 0, "saveit": false, "filestyle": "polygon", "hidename": false},
+      {"name": "saved_points", "size": 4, "save_flag": 3, "saveit": true, "filestyle": "points", "hidename": false},
+      {"name": "hidden_polygon", "size": 4, "save_flag": 9, "saveit": true, "filestyle": "polygon", "hidename": true},
+      {"name": "malformed_save", "size": 4, "save_flag": null}
+    ]
+  },
+
+  "corpus/array_define_real.pd": {
+    "_note": "Real-corpus regression for `array define`. 319 verbatim corpus rows + 2 subpatch rows + 19 synthetic rows = 340 define rows; 1 classic row; cross-kind duplicate sample_d_form.",
+    "arrays_define_count": 340,
+    "arrays_classic_count": 1,
+    "parse_status_clean_count": 336,
+    "parse_status_partial_count": 4,
+    "is_template_count": 114,
+    "cross_kind_duplicates": ["sample_d_form"],
+    "synthetic_payloads": {
+      "sample_unknown_guard": {
+        "name": "sample_unknown_guard",
+        "size": 32,
+        "define": {
+          "k": false, "yrange": null, "pix": null,
+          "discarded_tokens": [{"reason": "unknown_flag", "tokens": ["-newflag", "arg1", "arg2"]}],
+          "parse_status": "partial"
+        }
+      },
+      "sample_superseded": {
+        "define": {
+          "k": false, "yrange": [0, 128], "pix": null,
+          "discarded_tokens": [{"reason": "superseded_yrange", "tokens": ["-yrange", "0", "64"]}],
+          "parse_status": "partial"
+        }
+      },
+      "sample_malformed_yrange": {
+        "define": {
+          "k": false, "yrange": null, "pix": null,
+          "discarded_tokens": [{"reason": "malformed_yrange", "tokens": ["-yrange", "notanum", "nope"]}],
+          "parse_status": "partial"
+        }
+      },
+      "sample_partial_yrange": {
+        "define": {
+          "k": false, "yrange": null, "pix": null,
+          "discarded_tokens": [{"reason": "unknown_flag", "tokens": ["-yrange", "5"]}],
+          "parse_status": "partial"
+        }
+      },
+      "sample_all_flags": {
+        "define": {"k": true, "yrange": [0, 128], "pix": [600, 400], "discarded_tokens": [], "parse_status": "clean"}
+      },
+      "sample_float_yrange": {
+        "define": {"yrange": [0.5, 1.5], "parse_status": "clean"}
+      },
+      "sample_degenerate_yrange": {
+        "define": {"yrange": [5, 5], "parse_status": "clean"}
+      },
+      "sample_pix_subclamp": {
+        "define": {"pix": [5, 5], "parse_status": "clean"}
+      },
+      "sample_negative_yrange": {
+        "define": {"yrange": [-1, 1], "parse_status": "clean"}
+      },
+      "sample_negative_float_yrange": {
+        "define": {"yrange": [-10.5, 10.5], "parse_status": "clean"}
+      },
+      "sample_repeated_k": {
+        "define": {"k": true, "discarded_tokens": [], "parse_status": "clean"}
+      },
+      "-dashname_divergence": {
+        "name": "-dashname_divergence", "size": 16,
+        "define": {"k": false, "discarded_tokens": [], "parse_status": "clean"}
+      },
+      "synth_$0_buffer": {"is_template": false},
+      "weird_$10_name": {"is_template": true}
+    }
   }
 }

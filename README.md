@@ -59,7 +59,7 @@ pdtk batch    src/ format --in-place           # auto-format all files
 | | `lint` | Validate + detect bounding-box overlaps |
 | | `stats` | Per-file metrics: fan-in/out, class histogram, orphans |
 | | `connections` | List all patch cords to/from one object |
-| | `arrays` | List all PD arrays with name and size |
+| | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, and duplicate detection (schema v2) |
 | **Search** | `search` | Find objects by class name or text pattern (glob/regex) |
 | | `find-orphans` | Objects with zero connections |
 | | `find-displays` | Connected debug display widgets |

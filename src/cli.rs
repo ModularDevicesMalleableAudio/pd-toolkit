@@ -229,6 +229,15 @@ pub enum Commands {
         /// Output results as JSON
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+        /// Which array kinds to list
+        #[arg(long, value_name = "KIND", value_parser = ["classic", "define", "all"], help = "Filter by array kind: classic (#X array), define (array define), or all")]
+        kind: Option<String>,
+        /// How to handle template-named arrays ($1..$9 in name)
+        #[arg(long, value_name = "MODE", value_parser = ["include", "exclude", "only"], default_value = "include", help = "Template-name handling: include (default), exclude, or only")]
+        templates: String,
+        /// Pin output schema version
+        #[arg(long, value_name = "N", value_parser = ["1", "2"], default_value = "2", help = "Output schema version (1 or 2)")]
+        schema: String,
     },
 
     // Search & Analysis

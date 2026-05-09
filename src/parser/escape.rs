@@ -83,6 +83,35 @@ pub fn has_unescaped_dollar_digit(text: &str) -> bool {
     false
 }
 
+/// Reverse PD message-token escaping: `\$` → `$`, `\,` → `,`, `\;` → `;`.
+///
+/// Other backslash sequences are passed through unchanged (the backslash is
+/// preserved together with whatever follows it).  This is the inverse of the
+/// minimal escaping PD applies inside saved tokens such as array names.
+pub fn unescape_pd_token(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = String::with_capacity(s.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' && i + 1 < bytes.len() {
+            let next = bytes[i + 1];
+            if next == b'$' || next == b',' || next == b';' || next == b'\\' {
+                out.push(next as char);
+                i += 2;
+                continue;
+            }
+            // Unknown backslash sequence: preserve verbatim.
+            out.push('\\');
+            out.push(next as char);
+            i += 2;
+            continue;
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
 /// Return true if the entry body (excluding a trailing terminator `;`) contains
 /// an unescaped semicolon.
 pub fn has_unescaped_semicolon_in_body(entry_raw: &str) -> bool {
@@ -98,8 +127,18 @@ pub fn has_unescaped_semicolon_in_body(entry_raw: &str) -> bool {
 mod tests {
     use super::{
         escape_pd_dollars, has_unescaped_dollar_digit, has_unescaped_semicolon,
-        has_unescaped_semicolon_in_body,
+        has_unescaped_semicolon_in_body, unescape_pd_token,
     };
+
+    #[test]
+    fn unescape_pd_token_handles_known_escapes() {
+        assert_eq!(unescape_pd_token(r"\$1"), "$1");
+        assert_eq!(unescape_pd_token(r"foo\;bar"), "foo;bar");
+        assert_eq!(unescape_pd_token(r"a\,b"), "a,b");
+        assert_eq!(unescape_pd_token("no_escapes"), "no_escapes");
+        // Double-backslash followed by `$1`: preserved as literal backslash + escaped dollar.
+        assert_eq!(unescape_pd_token(r"\\\$1"), r"\$1");
+    }
 
     #[test]
     fn escapes_bare_dollar_digit() {

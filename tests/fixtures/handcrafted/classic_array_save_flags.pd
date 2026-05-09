@@ -1,0 +1,17 @@
+#N canvas 0 22 600 400 12;
+#N canvas 0 22 450 250 (subpatch) 0;
+#X array nosave_default 4 float 0;
+#X coords 0 1 3 -1 200 140 1 0 0;
+#X restore 30 30 graph;
+#N canvas 0 22 450 250 (subpatch) 0;
+#X array saved_points 4 float 3;
+#X coords 0 1 3 -1 200 140 1 0 0;
+#X restore 30 80 graph;
+#N canvas 0 22 450 250 (subpatch) 0;
+#X array hidden_polygon 4 float 9;
+#X coords 0 1 3 -1 200 140 1 0 0;
+#X restore 30 130 graph;
+#N canvas 0 22 450 250 (subpatch) 0;
+#X array malformed_save 4 float abc;
+#X coords 0 1 3 -1 200 140 1 0 0;
+#X restore 30 180 graph;

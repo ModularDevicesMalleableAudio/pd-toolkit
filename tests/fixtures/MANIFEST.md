@@ -30,6 +30,7 @@ Object indices are annotated in comments where relevant.
 | `fan_out_lint.pd` | Lint --fan-out | 6 | 4 | Control fan-out from bng (warn); signal fan-out from osc~ (no warn) |
 | `dsp_loop_lint.pd` | Lint --dsp-loop | 7 | 6 | Signal cycle, linear chain, control cycle (no warn) |
 | `arrays.pd` | Array definitions | 5 | 2 | Array inventory |
+| `classic_array_save_flags.pd` | `#X array … float K` save flag bitfield | 4 | 0 | K=0/3/9/abc (saveit, filestyle enum, hidename, malformed) |
 | `orphans.pd` | Unconnected objects | 5 | 1 | Orphan detection |
 | `displays.pd` | Connected debug displays | 7 | 4 | Display finder |
 | `signal_chain.pd` | Audio-rate objects | 5 | 5 | Signal type inference |
@@ -60,6 +61,7 @@ Real-world patches from [malleable808/sequencer](https://gitlab.com/malleable808
 | `width_hint_real.pd` | `seq_abs/euclidean_abs/euclid_mute.pd` | [`c3564e4`](https://gitlab.com/malleable808/sequencer/-/commit/c3564e4257948b0f9b88ed693eff70a5a2b4664f) | `#X f` after restore |
 | `floatatom_real.pd` | `view_abs/CLOCK_DIV_VIEW.pd` | [`843267e`](https://gitlab.com/malleable808/sequencer/-/commit/843267eab49194c0971ed57b91d755e436019760) | floatatom + mixed features |
 | `symbolatom_real.pd` | `view_abs/CC.pd` | [`748c03e`](https://gitlab.com/malleable808/sequencer/-/commit/748c03e00278b5d95e175fe05b0f7ae4ee8be6e0) | symbolatom usage |
+| `array_define_real.pd` | derived from `array-define.txt` (sequencer extract) | n/a (synthesised) | 319 real `array define` entries + 19 synthetic edge-case entries + 2 subpatch entries + 1 cross-kind classic dup. Used by structured-array-list spec; covers `-k`/`-yrange`/`-pix`/`array d` synonym/`$N` templates/dotted names/superseded/malformed/unknown-flag corruption guard |
 
 ## Abstraction Fixtures
 
