@@ -10,6 +10,7 @@ use crate::model::Patch;
 /// Each entry is written on its own "block" (multi-line entries preserve their
 /// internal newlines).  Entries are separated by a single `\n`, and the file
 /// ends with a trailing `\n`.
+#[must_use]
 pub fn serialize(patch: &Patch) -> String {
     let mut out = String::new();
     for (i, entry) in patch.entries.iter().enumerate() {

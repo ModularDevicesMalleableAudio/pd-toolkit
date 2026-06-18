@@ -1,7 +1,8 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::parser::parse;
+use pdtk::parser::parse;
 use serde::Serialize;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize)]
 struct ConnectionsReport {
@@ -80,10 +81,11 @@ pub fn run(file: &str, index: usize, depth: usize, json: bool) -> Result<String,
     } else {
         out.push_str("  Inlets:\n");
         for i in &report.inlets {
-            out.push_str(&format!(
-                "    ← [src:{} outlet:{}] {}\n",
+            let _ = writeln!(
+                out,
+                "    ← [src:{} outlet:{}] {}",
                 i.src, i.src_outlet, i.src_text
-            ));
+            );
         }
     }
     if report.outlets.is_empty() {
@@ -91,10 +93,11 @@ pub fn run(file: &str, index: usize, depth: usize, json: bool) -> Result<String,
     } else {
         out.push_str("  Outlets:");
         for o in &report.outlets {
-            out.push_str(&format!(
+            let _ = write!(
+                out,
                 "\n    → [dst:{} inlet:{}] {}",
                 o.dst, o.dst_inlet, o.dst_text
-            ));
+            );
         }
     }
     Ok(out)

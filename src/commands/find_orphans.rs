@@ -1,10 +1,11 @@
 use crate::commands::common::{delete_object, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::{build_entries, parse, tokenize_entries};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::{build_entries, parse, tokenize_entries};
+use pdtk::rewrite::serialize;
 use serde::Serialize;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize, Clone)]
 struct OrphanRow {
@@ -63,14 +64,14 @@ pub fn run(
     }
 
     if delete {
+        // Group by file and delete indices descending per depth
+        use std::collections::BTreeMap;
         if !in_place {
             return Err(PdtkError::Usage(
                 "--delete requires --in-place for find-orphans".to_string(),
             ));
         }
 
-        // Group by file and delete indices descending per depth
-        use std::collections::BTreeMap;
         let mut per_file: BTreeMap<String, Vec<(usize, usize)>> = BTreeMap::new();
         for r in &rows {
             per_file
@@ -90,7 +91,7 @@ pub fn run(
                 let _ = delete_object(&mut entries, d, i);
             }
 
-            let patch = pd_toolkit::model::Patch {
+            let patch = pdtk::model::Patch {
                 entries,
                 warnings: Vec::new(),
             };
@@ -117,10 +118,11 @@ pub fn run(
 
     let mut out = String::new();
     for r in rows {
-        out.push_str(&format!(
-            "{} [depth:{} index:{}] {}\n",
+        let _ = writeln!(
+            out,
+            "{} [depth:{} index:{}] {}",
             r.file, r.depth, r.index, r.text
-        ));
+        );
     }
     if delete {
         out.push_str("Deleted orphan objects in-place\n");

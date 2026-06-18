@@ -25,6 +25,10 @@ Object indices are annotated in comments where relevant.
 | `graph_and_pd_subpatches.pd` | Both subpatch types | 4 | 2 | Mixed graph + pd restore |
 | `float_vs_width.pd` | `f` class vs `, f N` | 5 | 5 | Disambiguation |
 | `all_gui_types.pd` | tgl/bng/nbx/etc | 12 | 9 | GUI send/receive fields |
+| `radio_compat_hdl_vdl.pd` | hdl/vdl old-compat radio classes | 4 | 2 | GUI send/receive extraction for compat radios |
+| `listbox_send_receive.pd` | `#X listbox` parsing | 5 | 3 | listbox indexing, send/receive at tokens 8/9, display detection |
+| `deps_builtin_aliases.pd` | builtin coverage | 13 | 0 | expr family, v alias, hdl/vdl, tabread~, makenote/stripnote, extra/ (bob~, slop~), listbox |
+| `trace_send_receive_hop.pd` | trace bus following | 12 | 6 | control/signal/$0 send→receive trios for `--show-bus-hops` |
 | `send_receive.pd` | s/r, s~/r~, throw~/catch~ | 9 | 5 | Send/receive pairs |
 | `send_receive_lint.pd` | Lint --send-receive | 7 | 0 | Orphan send, dead receive, matched pair, GUI send, s~/r~ |
 | `fan_out_lint.pd` | Lint --fan-out | 6 | 4 | Control fan-out from bng (warn); signal fan-out from osc~ (no warn) |

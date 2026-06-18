@@ -527,6 +527,40 @@ test_pdtk_integration() {
         skip "pdtk list — not yet implemented (step 2.2)"
     fi
 
+    # trace --show-bus-hops
+    if cmd_implemented "trace" "$probe"; then
+        local trace_fixture="$HANDCRAFTED_DIR/trace_send_receive_hop.pd"
+        if [ -f "$trace_fixture" ]; then
+            local out_wires=$("$pdtk" trace "$trace_fixture" --from 0 2>&1)
+            local out_buses=$("$pdtk" trace "$trace_fixture" --from 0 --show-bus-hops 2>&1)
+            # Default: must not reach index 3 (downstream of r foo).
+            if ! echo "$out_wires" | grep -q "index:3"; then
+                pass "pdtk trace default does not follow bus"
+            else
+                fail "pdtk trace default — reached index:3 (should not without --show-bus-hops)"
+            fi
+            # With --show-bus-hops: must reach index 3 and mention the bus.
+            if echo "$out_buses" | grep -q "index:3" && echo "$out_buses" | grep -q 'bus "foo"'; then
+                pass "pdtk trace --show-bus-hops follows bus"
+            else
+                fail "pdtk trace --show-bus-hops — expected index:3 and bus marker"
+            fi
+        fi
+    fi
+
+    # deps --buses
+    if cmd_implemented "deps" "$probe"; then
+        local bus_fixture="$HANDCRAFTED_DIR/send_receive.pd"
+        if [ -f "$bus_fixture" ]; then
+            local out=$("$pdtk" deps "$bus_fixture" --buses 2>&1)
+            if echo "$out" | grep -q "(control)" && echo "$out" | grep -q "(signal)" && echo "$out" | grep -q "(audio_sum)"; then
+                pass "pdtk deps --buses splits namespaces"
+            else
+                fail "pdtk deps --buses — expected control/signal/audio_sum rows. got: $out"
+            fi
+        fi
+    fi
+
     # Add further command blocks here as implementation steps complete.
 }
 

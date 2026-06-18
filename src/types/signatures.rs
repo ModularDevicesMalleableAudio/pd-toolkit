@@ -15,6 +15,7 @@ pub enum OutletType {
 /// For `trigger` (`t`), the argument list is parsed: each letter maps to an
 /// outlet type (b=Bang, f=Float, s=Symbol, l=List, a=anything→List,
 /// p=pointer→Unknown).
+#[must_use]
 pub fn outlet_types(class: &str, args: &[&str]) -> Option<Vec<OutletType>> {
     match class {
         // Trigger: one outlet per arg, left→right matches outlet 0, 1, 2, …
@@ -158,6 +159,7 @@ pub fn outlet_types(class: &str, args: &[&str]) -> Option<Vec<OutletType>> {
 }
 
 /// Returns the number of outlets for a known object, or `None` for unknowns.
+#[must_use]
 pub fn outlet_count(class: &str, args: &[&str]) -> Option<usize> {
     outlet_types(class, args).map(|v| v.len())
 }

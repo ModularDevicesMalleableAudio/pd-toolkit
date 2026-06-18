@@ -493,7 +493,8 @@ fn main() {
             depth,
             max_hops,
             json,
-        }) => match commands::trace::run(&file, from, to, depth, max_hops, json) {
+            show_bus_hops,
+        }) => match commands::trace::run(&file, from, to, depth, max_hops, json, show_bus_hops) {
             Ok(out) => {
                 if !out.is_empty() {
                     println!("{out}");
@@ -529,7 +530,18 @@ fn main() {
             json,
             search_path,
             pd_path,
-        }) => match commands::deps::run(&target, recursive, missing, json, &search_path, pd_path) {
+            buses,
+            per_file,
+        }) => match commands::deps::run(
+            &target,
+            recursive,
+            missing,
+            json,
+            &search_path,
+            pd_path,
+            buses,
+            per_file,
+        ) {
             Ok(out) => {
                 if !out.is_empty() {
                     println!("{out}");

@@ -3,12 +3,36 @@ use crate::parser::parse;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// Comprehensive list of known vanilla PD built-in object names.
-pub fn is_builtin(name: &str) -> bool {
-    BUILTINS.contains(name)
+/// Source of a builtin classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BuiltinSource {
+    /// Always-loaded vanilla core class.
+    Core,
+    /// Ships with pd-vanilla in `extra/`; requires `declare -lib` or
+    /// `-stdpath extra` at runtime, but reported here as found.
+    CoreExtra,
 }
 
-const BUILTIN_NAMES: &[&str] = &[
+/// True if `name` is a known vanilla class (core or extra).
+#[must_use]
+pub fn is_builtin(name: &str) -> bool {
+    builtin_source(name).is_some()
+}
+
+/// Classify a known builtin name. Returns `None` for unknown names.
+#[must_use]
+pub fn builtin_source(name: &str) -> Option<BuiltinSource> {
+    if CORE.contains(name) {
+        Some(BuiltinSource::Core)
+    } else if EXTRA.contains(name) {
+        Some(BuiltinSource::CoreExtra)
+    } else {
+        None
+    }
+}
+
+const CORE_NAMES: &[&str] = &[
     // Core control
     "bang",
     "b",
@@ -225,10 +249,38 @@ const BUILTIN_NAMES: &[&str] = &[
     "hsl",
     "vradio",
     "hradio",
+    "hdl",
+    "vdl",
     "vu",
     "cnv",
     "floatatom",
     "symbolatom",
+    "listbox",
+    // expr family
+    "expr",
+    "expr~",
+    "fexpr~",
+    // compat aliases
+    "v",
+    // modern additions
+    "clone",
+    "namecanvas",
+    "scalar",
+    "oscparse",
+    "oscformat",
+    // tabread/tabwrite signal-rate family
+    "tabread~",
+    "tabread4~",
+    "tabwrite~",
+    "tabosc4~",
+    "tabsend~",
+    "tabreceive~",
+    "tabplay~",
+    // missing control
+    "makenote",
+    "stripnote",
+    "poly",
+    "bag",
     // Subpatch / abstraction
     "pd",
     "inlet",
@@ -239,8 +291,31 @@ const BUILTIN_NAMES: &[&str] = &[
     "import",
 ];
 
-static BUILTINS: std::sync::LazyLock<std::collections::HashSet<&'static str>> =
-    std::sync::LazyLock::new(|| BUILTIN_NAMES.iter().copied().collect());
+/// pd-vanilla classes shipped in `extra/` (require `declare -lib` or
+/// `-stdpath extra` at runtime, but treated as known builtins so `deps`
+/// doesn't report them as missing abstractions).
+const EXTRA_NAMES: &[&str] = &[
+    "bob~",
+    "slop~",
+    "pdcontrol",
+    "fudiformat",
+    "fudiparse",
+    "savestate",
+    "bonk~",
+    "choice~",
+    "fiddle~",
+    "loop~",
+    "lrshift~",
+    "pique~",
+    "sigmund~",
+    "stdout",
+];
+
+static CORE: std::sync::LazyLock<std::collections::HashSet<&'static str>> =
+    std::sync::LazyLock::new(|| CORE_NAMES.iter().copied().collect());
+
+static EXTRA: std::sync::LazyLock<std::collections::HashSet<&'static str>> =
+    std::sync::LazyLock::new(|| EXTRA_NAMES.iter().copied().collect());
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DepEntry {
@@ -250,6 +325,10 @@ pub struct DepEntry {
     pub name: String,
     pub found: bool,
     pub found_at: Option<String>,
+    /// `Some(Core)` if vanilla core, `Some(CoreExtra)` if pd-vanilla `extra/`,
+    /// `None` for missing or abstraction-resolved entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<BuiltinSource>,
 }
 
 /// Collect abstraction search paths from `#X declare -path dir` entries in a file.
@@ -282,7 +361,7 @@ fn declare_paths(file: &Path, content: &str) -> Vec<PathBuf> {
 
 /// Search for `name.pd` in a list of directories.
 fn locate_abstraction(name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
-    let filename = format!("{}.pd", name);
+    let filename = format!("{name}.pd");
     for dir in search_dirs {
         let candidate = dir.join(&filename);
         if candidate.exists() {
@@ -360,17 +439,26 @@ fn analyse_file_with_ancestors(
         let depth = e.depth.saturating_sub(1);
         let class = e.class().to_string();
 
-        if is_builtin(&class) {
-            continue;
-        }
         // `pd` used as an object class is a subpatch reference, not an
         // abstraction lookup on disk.
         if class == "pd" {
             continue;
         }
 
-        let location = locate_abstraction(&class, &search_dirs);
-        let found = location.is_some();
+        // Core vanilla classes are not reported (would be very noisy).
+        // pd-vanilla extra/ classes ARE reported so users can see that a
+        // runtime declare may be required.
+        let source = builtin_source(&class);
+        if matches!(source, Some(BuiltinSource::Core)) {
+            continue;
+        }
+
+        let location = if source.is_some() {
+            None
+        } else {
+            locate_abstraction(&class, &search_dirs)
+        };
+        let found = source.is_some() || location.is_some();
         let found_at = location.as_ref().map(|p| p.display().to_string());
 
         results.push(DepEntry {
@@ -380,6 +468,7 @@ fn analyse_file_with_ancestors(
             name: class.clone(),
             found,
             found_at: found_at.clone(),
+            source,
         });
 
         // Recursive: follow found abstractions, propagating our full search
@@ -392,4 +481,53 @@ fn analyse_file_with_ancestors(
     }
 
     results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_builtin_core_classes() {
+        assert!(is_builtin("expr"));
+        assert!(is_builtin("expr~"));
+        assert!(is_builtin("fexpr~"));
+        assert!(is_builtin("v"));
+        assert!(is_builtin("clone"));
+        assert!(is_builtin("hdl"));
+        assert!(is_builtin("vdl"));
+        assert!(is_builtin("tabread~"));
+        assert!(is_builtin("tabwrite~"));
+        assert!(is_builtin("listbox"));
+        assert!(is_builtin("makenote"));
+        assert!(is_builtin("stripnote"));
+        assert!(is_builtin("namecanvas"));
+    }
+
+    #[test]
+    fn is_builtin_extra_classes() {
+        assert!(is_builtin("bob~"));
+        assert!(is_builtin("slop~"));
+        assert!(is_builtin("pdcontrol"));
+        assert!(is_builtin("sigmund~"));
+    }
+
+    #[test]
+    fn builtin_source_distinguishes_core_and_extra() {
+        assert_eq!(builtin_source("osc~"), Some(BuiltinSource::Core));
+        assert_eq!(builtin_source("expr"), Some(BuiltinSource::Core));
+        assert_eq!(builtin_source("listbox"), Some(BuiltinSource::Core));
+        assert_eq!(builtin_source("bob~"), Some(BuiltinSource::CoreExtra));
+        assert_eq!(builtin_source("slop~"), Some(BuiltinSource::CoreExtra));
+        assert_eq!(builtin_source("definitely_not_a_class"), None);
+    }
+
+    #[test]
+    fn text_define_classifies_as_text() {
+        // class() returns split_whitespace().nth(4), the first token only.
+        // So `text define foo` becomes class `text`, which is in CORE.
+        // This pins the behavior that multi-word builtins don't need stripping.
+        assert!(is_builtin("text"));
+        assert!(is_builtin("array"));
+    }
 }

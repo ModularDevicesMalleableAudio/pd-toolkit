@@ -3,6 +3,7 @@
 /// In `.pd` files, `$` followed by a digit must be written as `\$`.
 /// Existing escapes are preserved, and `$` followed by non-digits (e.g. `$f1`
 /// in `expr`) is left unchanged.
+#[must_use]
 pub fn escape_pd_dollars(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = String::with_capacity(text.len() + 4);
@@ -33,6 +34,7 @@ pub fn escape_pd_dollars(text: &str) -> String {
 ///
 /// A semicolon is considered escaped only when preceded by an odd number of
 /// consecutive backslashes.
+#[must_use]
 pub fn has_unescaped_semicolon(text: &str) -> bool {
     let bytes = text.as_bytes();
 
@@ -57,6 +59,7 @@ pub fn has_unescaped_semicolon(text: &str) -> bool {
 }
 
 /// Return true if `text` contains any unescaped `$` followed by a digit.
+#[must_use]
 pub fn has_unescaped_dollar_digit(text: &str) -> bool {
     let bytes = text.as_bytes();
 
@@ -88,6 +91,7 @@ pub fn has_unescaped_dollar_digit(text: &str) -> bool {
 /// Other backslash sequences are passed through unchanged (the backslash is
 /// preserved together with whatever follows it).  This is the inverse of the
 /// minimal escaping PD applies inside saved tokens such as array names.
+#[must_use]
 pub fn unescape_pd_token(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = String::with_capacity(s.len());
@@ -114,6 +118,7 @@ pub fn unescape_pd_token(s: &str) -> String {
 
 /// Return true if the entry body (excluding a trailing terminator `;`) contains
 /// an unescaped semicolon.
+#[must_use]
 pub fn has_unescaped_semicolon_in_body(entry_raw: &str) -> bool {
     let trimmed = entry_raw.trim_end();
     if let Some(body) = trimmed.strip_suffix(';') {

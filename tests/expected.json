@@ -199,6 +199,40 @@
     ]
   },
 
+  "handcrafted/trace_send_receive_hop.pd": {
+    "depth_0_objects": 12,
+    "depth_0_connections": 6,
+    "max_depth": 0,
+    "send_names": ["foo", "audio", "\\$0-instance"],
+    "receive_names": ["foo", "audio", "\\$0-instance"]
+  },
+
+  "handcrafted/deps_builtin_aliases.pd": {
+    "depth_0_objects": 13,
+    "depth_0_connections": 0,
+    "max_depth": 0
+  },
+
+  "handcrafted/listbox_send_receive.pd": {
+    "depth_0_objects": 5,
+    "depth_0_connections": 3,
+    "max_depth": 0,
+    "gui_send_receive": [
+      {"index": 2, "type": "listbox", "receive": "list_recv"},
+      {"index": 3, "type": "listbox", "send": "list_send"}
+    ]
+  },
+
+  "handcrafted/radio_compat_hdl_vdl.pd": {
+    "depth_0_objects": 4,
+    "depth_0_connections": 2,
+    "max_depth": 0,
+    "gui_send_receive": [
+      {"index": 0, "type": "hdl", "send": "hdl_send", "receive": "hdl_recv"},
+      {"index": 1, "type": "vdl", "send": "vdl_send", "receive": "vdl_recv"}
+    ]
+  },
+
   "handcrafted/send_receive.pd": {
     "depth_0_objects": 9,
     "depth_0_connections": 5,

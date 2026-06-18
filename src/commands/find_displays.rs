@@ -1,10 +1,11 @@
 use crate::commands::common::{delete_object, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::{build_entries, parse, tokenize_entries};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::{build_entries, parse, tokenize_entries};
+use pdtk::rewrite::serialize;
 use serde::Serialize;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize, Clone)]
 struct DisplayRow {
@@ -15,9 +16,9 @@ struct DisplayRow {
     connected: bool,
 }
 
-fn is_display(entry: &pd_toolkit::model::Entry, include_labels: bool) -> bool {
+fn is_display(entry: &pdtk::model::Entry, include_labels: bool) -> bool {
     match entry.kind {
-        EntryKind::FloatAtom | EntryKind::SymbolAtom => true,
+        EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => true,
         EntryKind::Obj => {
             let class = entry.class();
             class == "nbx" || class == "vu" || (include_labels && class == "cnv")
@@ -96,13 +97,13 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
     }
 
     if delete {
+        use std::collections::BTreeMap;
         if !in_place {
             return Err(PdtkError::Usage(
                 "--delete requires --in-place for find-displays".to_string(),
             ));
         }
 
-        use std::collections::BTreeMap;
         let mut per_file: BTreeMap<String, Vec<(usize, usize)>> = BTreeMap::new();
         for r in &rows {
             per_file
@@ -121,7 +122,7 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
                 let _ = delete_object(&mut entries, d, i);
             }
 
-            let patch = pd_toolkit::model::Patch {
+            let patch = pdtk::model::Patch {
                 entries,
                 warnings: Vec::new(),
             };
@@ -148,10 +149,11 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
 
     let mut out = String::new();
     for r in rows {
-        out.push_str(&format!(
-            "{} [depth:{} index:{} connected:{}] {}\n",
+        let _ = writeln!(
+            out,
+            "{} [depth:{} index:{} connected:{}] {}",
             r.file, r.depth, r.index, r.connected, r.text
-        ));
+        );
     }
     if delete {
         out.push_str("Deleted display objects in-place\n");

@@ -139,3 +139,14 @@ fn parse_malformed_missing_semicolon_emits_warning() {
     assert!(stdout.contains("Warnings: 1"));
     assert!(stdout.contains("UnterminatedEntry"));
 }
+
+#[test]
+fn parse_listbox_gets_object_index() {
+    let f = handcrafted("listbox_send_receive.pd");
+    let out = run_pdtk(&["parse", f.to_str().unwrap()]);
+    assert!(out.status.success());
+    let stdout = stdout_string(&out);
+    // 5 objects total: loadbang, msg, listbox, listbox, print
+    assert!(stdout.contains("Objects: 5"), "stdout was: {stdout}");
+    assert!(stdout.contains("Connections: 3"), "stdout was: {stdout}");
+}

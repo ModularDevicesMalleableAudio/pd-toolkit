@@ -1,9 +1,9 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::parse;
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::parse;
+use pdtk::rewrite::serialize;
 
 /// Inputs for the `disconnect` command.
 pub struct RunArgs<'a> {

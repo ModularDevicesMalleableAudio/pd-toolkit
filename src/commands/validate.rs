@@ -1,5 +1,5 @@
 use crate::errors::PdtkError;
-use pd_toolkit::{
+use pdtk::{
     model::{Connection, EntryKind},
     parser::{
         escape::{has_unescaped_dollar_digit, has_unescaped_semicolon_in_body},
@@ -8,6 +8,7 @@ use pd_toolkit::{
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 
 #[derive(Debug)]
 pub struct ValidateResult {
@@ -134,7 +135,7 @@ pub fn run(
     }
 
     let valid = errors.is_empty();
-    let exit_code = if valid { 0 } else { 1 };
+    let exit_code = i32::from(!valid);
 
     let text = if json {
         serde_json::to_string_pretty(&ValidateJson {
@@ -148,19 +149,19 @@ pub fn run(
         } else {
             let mut s = format!("OK: patch is valid ({} warning(s))", warnings.len());
             for w in &warnings {
-                s.push_str(&format!("\n- WARNING: {w}"));
+                let _ = write!(s, "\n- WARNING: {w}");
             }
             s
         }
     } else {
         let mut s = format!("INVALID: {} error(s)", errors.len());
         for e in &errors {
-            s.push_str(&format!("\n- {e}"));
+            let _ = write!(s, "\n- {e}");
         }
         if !warnings.is_empty() {
-            s.push_str(&format!("\n{} warning(s)", warnings.len()));
+            let _ = write!(s, "\n{} warning(s)", warnings.len());
             for w in &warnings {
-                s.push_str(&format!("\n- WARNING: {w}"));
+                let _ = write!(s, "\n- WARNING: {w}");
             }
         }
         s

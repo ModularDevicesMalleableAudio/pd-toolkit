@@ -67,6 +67,7 @@ pub struct DiffResult {
 }
 
 impl DiffResult {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.objects_added.is_empty()
             && self.objects_removed.is_empty()
@@ -77,7 +78,9 @@ impl DiffResult {
 }
 
 /// Compute structural diff between two patches.
+#[must_use]
 pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
+    use std::collections::HashSet;
     let max_depth = a.max_depth().max(b.max_depth());
 
     let mut objects_added = Vec::new();
@@ -216,7 +219,6 @@ pub fn diff_patches(a: &Patch, b: &Patch, ignore_coords: bool) -> DiffResult {
         let a_conns = a.connections_at_depth(depth);
         let b_conns = b.connections_at_depth(depth);
 
-        use std::collections::HashSet;
         let b_conn_set: HashSet<(usize, usize, usize, usize)> = b_conns
             .iter()
             .map(|c| (c.src, c.src_outlet, c.dst, c.dst_inlet))

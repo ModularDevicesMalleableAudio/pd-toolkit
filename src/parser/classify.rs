@@ -1,5 +1,6 @@
 use crate::model::EntryKind;
 
+#[must_use]
 pub fn classify_entry(raw: &str) -> EntryKind {
     let trimmed = raw.trim();
 
@@ -31,6 +32,7 @@ pub fn classify_entry(raw: &str) -> EntryKind {
         "text" => EntryKind::Text,
         "floatatom" => EntryKind::FloatAtom,
         "symbolatom" => EntryKind::SymbolAtom,
+        "listbox" => EntryKind::ListAtom,
         "restore" => EntryKind::Restore,
         "connect" => EntryKind::Connect,
         "coords" => EntryKind::Coords,
@@ -93,6 +95,14 @@ mod tests {
         assert_eq!(
             classify_entry("#X symbolatom 10 10 10 0 0 0 - - -;"),
             EntryKind::SymbolAtom
+        );
+    }
+
+    #[test]
+    fn classify_listbox() {
+        assert_eq!(
+            classify_entry("#X listbox 10 10 20 0 0 0 - - -;"),
+            EntryKind::ListAtom
         );
     }
 

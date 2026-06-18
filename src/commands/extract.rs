@@ -1,10 +1,10 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::{Connection, Entry, EntryKind};
-use pd_toolkit::parser::escape::escape_pd_dollars;
-use pd_toolkit::parser::{assign_depth_and_indices, build_entries, parse, tokenize_entries};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::{Connection, Entry, EntryKind};
+use pdtk::parser::escape::escape_pd_dollars;
+use pdtk::parser::{assign_depth_and_indices, build_entries, parse, tokenize_entries};
+use pdtk::rewrite::serialize;
 
 pub fn run(
     file: &str,
@@ -84,7 +84,7 @@ pub fn run(
     let max_y: i32 = interior
         .iter()
         .filter(|e| e.depth == direct_depth && e.object_index.is_some())
-        .filter_map(|e| e.y())
+        .filter_map(pdtk::model::Entry::y)
         .max()
         .unwrap_or(100);
 
@@ -186,13 +186,14 @@ pub fn run(
             kind: EntryKind::Obj,
             depth: sub_canvas_internal_depth,
             object_index: None,
+            canvas_id: None,
         };
 
         src_entries.drain(canvas_pos..end);
         src_entries.insert(canvas_pos, replacement);
         assign_depth_and_indices(&mut src_entries);
 
-        let modified_patch = pd_toolkit::model::Patch {
+        let modified_patch = pdtk::model::Patch {
             entries: src_entries,
             warnings: Vec::new(),
         };

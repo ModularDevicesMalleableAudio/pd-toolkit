@@ -9,6 +9,7 @@ pub struct TokenizeResult {
     pub warnings: Vec<TokenizeWarning>,
 }
 
+#[must_use]
 pub fn tokenize_entries(input: &str) -> TokenizeResult {
     if input.is_empty() {
         return TokenizeResult::default();

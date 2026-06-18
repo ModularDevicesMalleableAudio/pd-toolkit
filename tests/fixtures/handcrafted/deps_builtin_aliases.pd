@@ -1,0 +1,14 @@
+#N canvas 0 22 500 400 12;
+#X obj 50 50 expr $f1 + $f2;
+#X obj 50 100 expr~ $f1 * 0.5;
+#X obj 50 150 fexpr~ $x1[0];
+#X obj 50 200 v my_value;
+#X obj 50 250 clone -s 0 looper 4;
+#X obj 50 300 tabread~ wavetable;
+#X obj 50 350 hdl 15 1 0 8 hdl_s hdl_r empty 0 -8 0 10 -262144 -1 -1 0;
+#X obj 250 50 vdl 15 1 0 8 vdl_s vdl_r empty 0 -8 0 10 -262144 -1 -1 0;
+#X obj 250 100 makenote;
+#X obj 250 150 stripnote;
+#X obj 250 200 bob~;
+#X obj 250 250 slop~ 100 10 10;
+#X listbox 250 300 20 0 0 0 - - -;

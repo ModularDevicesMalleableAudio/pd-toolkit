@@ -1,8 +1,9 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::parser::parse;
+use pdtk::parser::parse;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write;
 
 #[derive(Debug, Serialize)]
 struct FileStats {
@@ -27,7 +28,7 @@ struct StatsReport {
 }
 
 fn is_display(class: &str) -> bool {
-    matches!(class, "floatatom" | "symbolatom" | "nbx" | "vu")
+    matches!(class, "floatatom" | "symbolatom" | "listbox" | "nbx" | "vu")
 }
 
 pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
@@ -47,7 +48,7 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
         let connections: Vec<_> = patch
             .entries
             .iter()
-            .filter(|e| e.kind == pd_toolkit::model::EntryKind::Connect)
+            .filter(|e| e.kind == pdtk::model::EntryKind::Connect)
             .collect();
 
         let mut class_hist = BTreeMap::new();
@@ -73,7 +74,7 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
             let key = (d, idx);
             let degree =
                 fanin.get(&key).copied().unwrap_or(0) + fanout.get(&key).copied().unwrap_or(0);
-            if degree == 0 && e.kind != pd_toolkit::model::EntryKind::Text {
+            if degree == 0 && e.kind != pdtk::model::EntryKind::Text {
                 orphans += 1;
             }
             if is_display(e.class()) {
@@ -84,7 +85,7 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
         let arrays = patch
             .entries
             .iter()
-            .filter(|e| e.kind == pd_toolkit::model::EntryKind::Array)
+            .filter(|e| e.kind == pdtk::model::EntryKind::Array)
             .count();
 
         report_rows.push(FileStats {
@@ -118,14 +119,24 @@ pub fn run(target: &str, json: bool) -> Result<String, PdtkError> {
 
     let mut out = String::new();
     for f in &report.files {
-        out.push_str(&format!(
-            "{}: objects={} connections={} max_depth={} max_fanin={} max_fanout={} orphans={} displays={} arrays={}\n",
-            f.file, f.objects, f.connections, f.max_depth, f.max_fanin, f.max_fanout, f.orphans, f.displays, f.arrays
-        ));
+        let _ = writeln!(
+            out,
+            "{}: objects={} connections={} max_depth={} max_fanin={} max_fanout={} orphans={} displays={} arrays={}",
+            f.file,
+            f.objects,
+            f.connections,
+            f.max_depth,
+            f.max_fanin,
+            f.max_fanout,
+            f.orphans,
+            f.displays,
+            f.arrays
+        );
     }
-    out.push_str(&format!(
+    let _ = write!(
+        out,
         "TOTAL files={} objects={} connections={}",
         report.total_files, report.total_objects, report.total_connections
-    ));
+    );
     Ok(out)
 }

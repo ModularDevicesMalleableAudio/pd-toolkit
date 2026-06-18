@@ -2,10 +2,10 @@ use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
 use crate::types::signatures::outlet_count;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::escape::{escape_pd_dollars, has_unescaped_semicolon};
-use pd_toolkit::parser::parse;
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::escape::{escape_pd_dollars, has_unescaped_semicolon};
+use pdtk::parser::parse;
+use pdtk::rewrite::serialize;
 
 pub fn run(
     file: &str,
@@ -36,7 +36,8 @@ pub fn run(
         | EntryKind::Msg
         | EntryKind::Text
         | EntryKind::FloatAtom
-        | EntryKind::SymbolAtom => {}
+        | EntryKind::SymbolAtom
+        | EntryKind::ListAtom => {}
         EntryKind::Connect => {
             return Err(PdtkError::Usage(
                 "cannot modify a #X connect entry".to_string(),
@@ -100,8 +101,7 @@ pub fn run(
             && max_outlet >= new_outlets
         {
             warning = Some(format!(
-                "warning: new object '{}' has {} outlet(s) but connection uses outlet {}",
-                new_class, new_outlets, max_outlet
+                "warning: new object '{new_class}' has {new_outlets} outlet(s) but connection uses outlet {max_outlet}"
             ));
         }
     }
@@ -114,6 +114,7 @@ pub fn run(
         EntryKind::Text => "text",
         EntryKind::FloatAtom => "floatatom",
         EntryKind::SymbolAtom => "symbolatom",
+        EntryKind::ListAtom => "listbox",
         _ => "obj",
     };
     let new_raw = format!("#X {prefix} {x} {y} {escaped_text};");

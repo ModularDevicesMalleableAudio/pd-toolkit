@@ -34,6 +34,7 @@ pub enum EntryKind {
     Text,       // #X text
     FloatAtom,  // #X floatatom
     SymbolAtom, // #X symbolatom
+    ListAtom,   // #X listbox
     Restore,    // #X restore
     Connect,    // #X connect
     Coords,     // #X coords
@@ -56,6 +57,12 @@ pub struct Entry {
     /// (user = internal − 1).
     pub depth: usize,
     pub object_index: Option<usize>,
+    /// Identifies the specific canvas instance this entry belongs to.
+    /// Two sibling subpatches both at the same depth have different
+    /// `canvas_id`s. The root canvas is 0. `None` for entries that are
+    /// not inside a canvas (shouldn't normally happen for well-formed
+    /// patches).
+    pub canvas_id: Option<usize>,
 }
 
 // Helpers shared by Entry methods
@@ -76,19 +83,21 @@ fn content_without_width_hint(raw: &str) -> &str {
 /// For GUI objects, returns the (send_arg_index, receive_arg_index) into the
 /// args() slice (0-based, after class+coords have been removed).
 /// Returns None for non-GUI objects, or for vu which only has a receive.
+#[must_use]
 pub fn gui_send_receive_arg_indices(class: &str) -> Option<(usize, usize)> {
     match class {
         "tgl" => Some((2, 3)),
         "bng" => Some((4, 5)),
         "nbx" => Some((6, 7)),
         "vsl" | "hsl" => Some((6, 7)),
-        "vradio" | "hradio" => Some((4, 5)),
+        "vradio" | "hradio" | "hdl" | "vdl" => Some((4, 5)),
         "cnv" => Some((3, 4)),
         _ => None,
     }
 }
 
 /// vu has only a receive field (no send).  Returns its arg index.
+#[must_use]
 pub fn vu_receive_arg_index() -> usize {
     2
 }
@@ -105,6 +114,7 @@ impl Entry {
     ///   `, f N` width hint stripped first.
     /// - For other object-like kinds: the kind name itself ("msg", "text",
     ///   "floatatom", "symbolatom", "restore").
+    #[must_use]
     pub fn class(&self) -> &str {
         match self.kind {
             EntryKind::Obj => content_without_width_hint(&self.raw)
@@ -115,6 +125,7 @@ impl Entry {
             EntryKind::Text => "text",
             EntryKind::FloatAtom => "floatatom",
             EntryKind::SymbolAtom => "symbolatom",
+            EntryKind::ListAtom => "listbox",
             EntryKind::Restore => "restore",
             EntryKind::Connect => "connect",
             EntryKind::CanvasOpen => "canvas",
@@ -129,6 +140,7 @@ impl Entry {
 
     /// Arguments after the class name for `#X obj` entries, with any trailing
     /// `, f N` width hint stripped.  Empty vec for all other kinds.
+    #[must_use]
     pub fn args(&self) -> Vec<String> {
         if self.kind != EntryKind::Obj {
             return Vec::new();
@@ -142,6 +154,7 @@ impl Entry {
 
     /// X canvas coordinate (pixel position).  Available for all object-like
     /// entry types.
+    #[must_use]
     pub fn x(&self) -> Option<i32> {
         match self.kind {
             EntryKind::Obj
@@ -155,6 +168,7 @@ impl Entry {
     }
 
     /// Y canvas coordinate (pixel position).
+    #[must_use]
     pub fn y(&self) -> Option<i32> {
         match self.kind {
             EntryKind::Obj
@@ -169,6 +183,7 @@ impl Entry {
 
     /// The embedded send name for GUI objects, or None if absent / set to the
     /// sentinel value "empty" or "-".
+    #[must_use]
     pub fn gui_send(&self) -> Option<String> {
         match self.kind {
             EntryKind::Obj => {
@@ -183,8 +198,8 @@ impl Entry {
                     Some(val.clone())
                 }
             }
-            EntryKind::FloatAtom | EntryKind::SymbolAtom => {
-                // #X floatatom/symbolatom X Y width min max flag send receive label
+            EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => {
+                // #X floatatom/symbolatom/listbox X Y width min max flag send receive label
                 // send is word[8]
                 let words: Vec<&str> = self.raw.split_whitespace().collect();
                 let val = words.get(8)?;
@@ -199,6 +214,7 @@ impl Entry {
     }
 
     /// The embedded receive name for GUI objects.
+    #[must_use]
     pub fn gui_receive(&self) -> Option<String> {
         match self.kind {
             EntryKind::Obj => {
@@ -221,7 +237,7 @@ impl Entry {
                     Some(val.clone())
                 }
             }
-            EntryKind::FloatAtom | EntryKind::SymbolAtom => {
+            EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => {
                 // receive is word[9]
                 let words: Vec<&str> = self.raw.split_whitespace().collect();
                 let val = words.get(9)?;
@@ -248,6 +264,7 @@ pub struct Connection {
 
 impl Connection {
     /// Parse a raw `#X connect src outlet dst inlet;` entry.
+    #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
         let trimmed = raw.trim().trim_end_matches(';');
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
@@ -274,6 +291,7 @@ pub struct Patch {
 impl Patch {
     /// Number of object-indexed entries at user-facing depth `d`.
     /// User depth 0 = top-level canvas, 1 = first level of subpatch, etc.
+    #[must_use]
     pub fn object_count_at_depth(&self, user_depth: usize) -> usize {
         let internal = user_depth + 1;
         self.entries
@@ -283,6 +301,7 @@ impl Patch {
     }
 
     /// The entry at user-facing depth `d` with object index `idx`.
+    #[must_use]
     pub fn object_at(&self, user_depth: usize, idx: usize) -> Option<&Entry> {
         let internal = user_depth + 1;
         self.entries
@@ -291,6 +310,7 @@ impl Patch {
     }
 
     /// All connections at user-facing depth `d`.
+    #[must_use]
     pub fn connections_at_depth(&self, user_depth: usize) -> Vec<Connection> {
         let internal = user_depth + 1;
         self.entries
@@ -301,6 +321,7 @@ impl Patch {
     }
 
     /// Maximum user-facing depth that contains at least one object.
+    #[must_use]
     pub fn max_depth(&self) -> usize {
         self.entries
             .iter()
@@ -311,10 +332,33 @@ impl Patch {
     }
 
     /// Total number of `#N canvas` entries (root + subpatches).
+    #[must_use]
     pub fn canvas_count(&self) -> usize {
         self.entries
             .iter()
             .filter(|e| e.kind == EntryKind::CanvasOpen)
             .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gui_indices_hradio_vradio() {
+        assert_eq!(gui_send_receive_arg_indices("hradio"), Some((4, 5)));
+        assert_eq!(gui_send_receive_arg_indices("vradio"), Some((4, 5)));
+    }
+
+    #[test]
+    fn gui_indices_hdl_vdl_compat() {
+        assert_eq!(gui_send_receive_arg_indices("hdl"), Some((4, 5)));
+        assert_eq!(gui_send_receive_arg_indices("vdl"), Some((4, 5)));
+    }
+
+    #[test]
+    fn gui_indices_unknown_class() {
+        assert_eq!(gui_send_receive_arg_indices("osc~"), None);
     }
 }

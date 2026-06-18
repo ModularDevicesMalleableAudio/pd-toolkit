@@ -1,6 +1,6 @@
 mod helpers;
 use helpers::{handcrafted, read_fixture};
-use pd_toolkit::{
+use pdtk::{
     model::{EntryKind, ParseError},
     parser::parse,
     rewrite::serialize,
@@ -8,7 +8,7 @@ use pd_toolkit::{
 
 // Helpers
 
-fn parse_fixture(name: &str) -> pd_toolkit::model::Patch {
+fn parse_fixture(name: &str) -> pdtk::model::Patch {
     let input = read_fixture(&handcrafted(name));
     parse(&input).unwrap_or_else(|e| panic!("parse failed for {name}: {e}"))
 }

@@ -1,7 +1,7 @@
 use crate::errors::PdtkError;
 use crate::io;
 use glob::Pattern;
-use pd_toolkit::parser::parse;
+use pdtk::parser::parse;
 use regex::RegexBuilder;
 use serde::Serialize;
 
@@ -41,10 +41,10 @@ pub fn run(
     };
 
     let glob_matcher = if let Some(p) = text {
-        if !regex {
-            Some(Pattern::new(p).map_err(|e| PdtkError::Usage(format!("invalid glob: {e}")))?)
-        } else {
+        if regex {
             None
+        } else {
+            Some(Pattern::new(p).map_err(|e| PdtkError::Usage(format!("invalid glob: {e}")))?)
         }
     } else {
         None
@@ -80,7 +80,7 @@ pub fn run(
                 }
             }
 
-            let full_text = if e.kind == pd_toolkit::model::EntryKind::Obj {
+            let full_text = if e.kind == pdtk::model::EntryKind::Obj {
                 let mut s = class.clone();
                 let args = e.args();
                 if !args.is_empty() {

@@ -89,3 +89,14 @@ fn displays_delete_validates_before_write() {
     let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(v.status.code(), Some(0));
 }
+
+#[test]
+fn displays_finds_listbox() {
+    let f = handcrafted("listbox_send_receive.pd");
+    let out = pdtk_output(&[
+        "find-displays",
+        f.to_str().unwrap(),
+        "--include-unconnected",
+    ]);
+    assert!(out.contains("listbox"), "output was: {out}");
+}

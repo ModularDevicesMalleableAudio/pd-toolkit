@@ -1,11 +1,9 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::{Entry, EntryKind};
-use pd_toolkit::parser::{
-    assign_depth_and_indices, build_entries, classify_entry, tokenize_entries,
-};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::{Entry, EntryKind};
+use pdtk::parser::{assign_depth_and_indices, build_entries, classify_entry, tokenize_entries};
+use pdtk::rewrite::serialize;
 
 pub fn run(
     file: &str,
@@ -40,6 +38,7 @@ pub fn run(
         kind: classify_entry(entry),
         depth: internal_depth,
         object_index: Some(index),
+        canvas_id: None,
     };
 
     // Find insertion position: before the first entry at this depth with
@@ -68,7 +67,7 @@ pub fn run(
     entries.insert(insert_pos, new_entry);
 
     // Renumber connections at this depth: src/dst >= original index get +1
-    for e in entries.iter_mut() {
+    for e in &mut entries {
         if e.kind != EntryKind::Connect || e.depth != internal_depth {
             continue;
         }
@@ -109,14 +108,14 @@ pub fn run(
     // Re-assign depth/index to make the model consistent
     assign_depth_and_indices(&mut entries);
 
-    let patch = pd_toolkit::model::Patch {
+    let patch = pdtk::model::Patch {
         entries,
         warnings: Vec::new(),
     };
     let serialized = serialize(&patch);
 
     // Validate before writing
-    let errors = validate_patch(&pd_toolkit::parser::parse(&serialized)?);
+    let errors = validate_patch(&pdtk::parser::parse(&serialized)?);
     if !errors.is_empty() {
         return Err(PdtkError::Usage(format!(
             "validation failed after insert: {}",

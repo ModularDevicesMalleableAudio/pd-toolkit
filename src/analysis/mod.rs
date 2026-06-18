@@ -1,3 +1,4 @@
+pub mod buses;
 pub mod deps;
 pub mod diff;
 pub mod graph;

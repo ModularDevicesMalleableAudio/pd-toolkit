@@ -1,14 +1,14 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::layout::{
+use pdtk::layout::{
     crossing::{group_by_layer, reorder},
     graph::LayoutGraph,
     layer::assign_layers,
     place::{LayoutOptions, estimate_width, place_nodes},
 };
-use pd_toolkit::model::{Entry, EntryKind};
-use pd_toolkit::parser::parse;
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::{Entry, EntryKind};
+use pdtk::parser::parse;
+use pdtk::rewrite::serialize;
 
 /// Inputs for the `format` command.
 pub struct RunArgs<'a> {
@@ -92,7 +92,7 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
         let coords = place_nodes(&ordered, &widths, &opts);
 
         // Rewrite only X/Y in the object entries — nothing else changes
-        for e in patch.entries.iter_mut() {
+        for e in &mut patch.entries {
             if e.depth != internal {
                 continue;
             }
@@ -146,6 +146,7 @@ fn rewrite_coords(entry: &mut Entry, new_x: i32, new_y: i32) {
         | EntryKind::Text
         | EntryKind::FloatAtom
         | EntryKind::SymbolAtom
+        | EntryKind::ListAtom
         | EntryKind::Restore => {}
         _ => return,
     }
@@ -190,6 +191,6 @@ fn rewrite_coords(entry: &mut Entry, new_x: i32, new_y: i32) {
         let prefix = entry.raw[..xs].to_string();
         let between = entry.raw[xe..ys].to_string();
         let suffix = entry.raw[ye..].to_string();
-        entry.raw = format!("{}{}{}{}{}", prefix, new_x, between, new_y, suffix);
+        entry.raw = format!("{prefix}{new_x}{between}{new_y}{suffix}");
     }
 }

@@ -1,0 +1,7 @@
+#N canvas 0 22 600 400 12;
+#X obj 50 50 hdl 15 1 0 8 hdl_send hdl_recv empty 0 -8 0 10 -262144 -1 -1 0;
+#X obj 50 200 vdl 15 1 0 8 vdl_send vdl_recv empty 0 -8 0 10 -262144 -1 -1 0;
+#X obj 300 50 print hdl_out;
+#X obj 300 200 print vdl_out;
+#X connect 0 0 2 0;
+#X connect 1 0 3 0;

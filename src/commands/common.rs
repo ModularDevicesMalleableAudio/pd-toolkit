@@ -1,5 +1,5 @@
-use pd_toolkit::model::{Entry, EntryKind, Patch};
-use pd_toolkit::parser::assign_depth_and_indices;
+use pdtk::model::{Entry, EntryKind, Patch};
+use pdtk::parser::assign_depth_and_indices;
 
 /// Post-mutation validation: checks that all connection src/dst indices are in
 /// range for their depth.  Returns a list of error strings (empty = valid).

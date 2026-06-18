@@ -1,6 +1,7 @@
 use crate::errors::PdtkError;
 use crate::io;
 use serde::Serialize;
+use std::fmt::Write;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize)]
@@ -75,7 +76,7 @@ pub fn run(
         }
 
         // Build the full argument list: command_args + [file_path]
-        let mut args: Vec<String> = command_args.iter().map(|s| s.to_string()).collect();
+        let mut args: Vec<String> = command_args.iter().map(ToString::to_string).collect();
         args.push(file_str.clone());
 
         // Execute pdtk as a subprocess
@@ -106,7 +107,7 @@ pub fn run(
         }
     }
 
-    let exit_code = if failed > 0 { 1 } else { 0 };
+    let exit_code = i32::from(failed > 0);
 
     let report = BatchReport {
         total: results.len(),
@@ -128,13 +129,20 @@ pub fn run(
     );
     for r in &report.results {
         match r.status {
-            "ok" => out.push_str(&format!("  OK      {}\n", r.file)),
-            "error" => out.push_str(&format!(
-                "  ERROR   {} — {}\n",
-                r.file,
-                r.error.as_deref().unwrap_or("unknown error")
-            )),
-            "would_run" => out.push_str(&format!("  DRY-RUN {}\n", r.file)),
+            "ok" => {
+                let _ = writeln!(out, "  OK      {}", r.file);
+            }
+            "error" => {
+                let _ = writeln!(
+                    out,
+                    "  ERROR   {} — {}",
+                    r.file,
+                    r.error.as_deref().unwrap_or("unknown error")
+                );
+            }
+            "would_run" => {
+                let _ = writeln!(out, "  DRY-RUN {}", r.file);
+            }
             _ => {}
         }
     }

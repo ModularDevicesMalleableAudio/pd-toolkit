@@ -2,6 +2,7 @@ use crate::model::{Entry, EntryKind};
 
 use super::classify::classify_entry;
 
+#[must_use]
 pub fn build_entries(raw_entries: &[String]) -> Vec<Entry> {
     let mut entries: Vec<Entry> = raw_entries
         .iter()
@@ -10,6 +11,7 @@ pub fn build_entries(raw_entries: &[String]) -> Vec<Entry> {
             kind: classify_entry(raw),
             depth: 0,
             object_index: None,
+            canvas_id: None,
         })
         .collect();
 
@@ -21,12 +23,21 @@ pub fn assign_depth_and_indices(entries: &mut [Entry]) {
     let mut depth: usize = 0;
     // One object counter per open canvas (resets when a new canvas opens)
     let mut canvas_counters: Vec<usize> = Vec::new();
+    // Stack of canvas_ids currently open (top = innermost open canvas).
+    let mut canvas_id_stack: Vec<usize> = Vec::new();
+    // Monotonic id assigned to each `#N canvas` in document order.
+    let mut next_canvas_id: usize = 0;
 
     for entry in entries.iter_mut() {
         match entry.kind {
             EntryKind::CanvasOpen => {
                 entry.depth = depth;
                 entry.object_index = None;
+                let id = next_canvas_id;
+                next_canvas_id += 1;
+                // The canvas-open entry itself belongs to its parent canvas.
+                entry.canvas_id = canvas_id_stack.last().copied();
+                canvas_id_stack.push(id);
 
                 depth += 1;
                 canvas_counters.push(0);
@@ -35,9 +46,11 @@ pub fn assign_depth_and_indices(entries: &mut [Entry]) {
                 // Close current canvas first
                 depth = depth.saturating_sub(1);
                 canvas_counters.pop();
+                canvas_id_stack.pop();
 
                 // Restore box is an object in parent canvas
                 entry.depth = depth;
+                entry.canvas_id = canvas_id_stack.last().copied();
                 if let Some(parent_counter) = canvas_counters.last_mut() {
                     entry.object_index = Some(*parent_counter);
                     *parent_counter += 1;
@@ -49,8 +62,10 @@ pub fn assign_depth_and_indices(entries: &mut [Entry]) {
             | EntryKind::Msg
             | EntryKind::Text
             | EntryKind::FloatAtom
-            | EntryKind::SymbolAtom => {
+            | EntryKind::SymbolAtom
+            | EntryKind::ListAtom => {
                 entry.depth = depth;
+                entry.canvas_id = canvas_id_stack.last().copied();
                 if let Some(counter) = canvas_counters.last_mut() {
                     entry.object_index = Some(*counter);
                     *counter += 1;
@@ -60,6 +75,7 @@ pub fn assign_depth_and_indices(entries: &mut [Entry]) {
             }
             _ => {
                 entry.depth = depth;
+                entry.canvas_id = canvas_id_stack.last().copied();
                 entry.object_index = None;
             }
         }

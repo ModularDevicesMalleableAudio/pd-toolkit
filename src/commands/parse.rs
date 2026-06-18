@@ -1,6 +1,7 @@
 use crate::errors::PdtkError;
-use pd_toolkit::{model::EntryKind, parser::parse, rewrite::serialize};
+use pdtk::{model::EntryKind, parser::parse, rewrite::serialize};
 use serde::Serialize;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize)]
 struct ParseSummary {
@@ -51,17 +52,17 @@ pub fn run(
     }
 
     let mut out = String::new();
-    out.push_str(&format!("Objects: {}\n", summary.objects));
-    out.push_str(&format!("Connections: {}\n", summary.connections));
-    out.push_str(&format!("Max depth: {}\n", summary.max_depth));
-    out.push_str(&format!("Canvases: {}", summary.canvases));
+    let _ = writeln!(out, "Objects: {}", summary.objects);
+    let _ = writeln!(out, "Connections: {}", summary.connections);
+    let _ = writeln!(out, "Max depth: {}", summary.max_depth);
+    let _ = write!(out, "Canvases: {}", summary.canvases);
 
     if summary.warnings.is_empty() {
         out.push_str("\nWarnings: 0");
     } else {
-        out.push_str(&format!("\nWarnings: {}", summary.warnings.len()));
+        let _ = write!(out, "\nWarnings: {}", summary.warnings.len());
         for w in &summary.warnings {
-            out.push_str(&format!("\n- {w}"));
+            let _ = write!(out, "\n- {w}");
         }
     }
 
@@ -90,10 +91,10 @@ pub fn run(
             }
         }
         out.push_str("\n\nEntry breakdown:");
-        out.push_str(&format!("\n  Object entries: {obj_count}"));
-        out.push_str(&format!("\n  Connect entries: {conn_count}"));
-        out.push_str(&format!("\n  Other entries: {other_count}"));
-        out.push_str(&format!("\n  Total entries: {}", patch.entries.len()));
+        let _ = write!(out, "\n  Object entries: {obj_count}");
+        let _ = write!(out, "\n  Connect entries: {conn_count}");
+        let _ = write!(out, "\n  Other entries: {other_count}");
+        let _ = write!(out, "\n  Total entries: {}", patch.entries.len());
     }
 
     Ok(out)

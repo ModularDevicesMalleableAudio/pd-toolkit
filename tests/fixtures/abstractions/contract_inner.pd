@@ -1,0 +1,5 @@
+#N canvas 0 22 300 200 12;
+#X obj 50 50 r control_bus;
+#X obj 50 100 s reply_bus;
+#X obj 50 150 r \$0-internal;
+#X obj 50 200 s \$1-arg_bus;

@@ -18,6 +18,7 @@ pub struct LayoutGraph {
 }
 
 impl LayoutGraph {
+    #[must_use]
     pub fn build(patch: &Patch, depth: usize) -> Self {
         let node_count = patch.object_count_at_depth(depth);
         let edges = patch
@@ -32,6 +33,7 @@ impl LayoutGraph {
     }
 
     /// Predecessors of each node (nodes that have an edge *into* it).
+    #[must_use]
     pub fn predecessors(&self, node: usize) -> Vec<usize> {
         self.edges
             .iter()
@@ -41,6 +43,7 @@ impl LayoutGraph {
     }
 
     /// Successors of each node.
+    #[must_use]
     pub fn successors(&self, node: usize) -> Vec<usize> {
         self.edges
             .iter()
@@ -51,6 +54,7 @@ impl LayoutGraph {
 
     /// Back edges according to a DFS post-order.  Returns the set of (src,dst)
     /// pairs that form cycles.  Removing these makes the graph a DAG.
+    #[must_use]
     pub fn back_edges(&self) -> std::collections::HashSet<(usize, usize)> {
         let mut visited = vec![false; self.node_count];
         let mut in_stack = vec![false; self.node_count];

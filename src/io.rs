@@ -15,7 +15,7 @@ pub fn write_patch_file(path: &str, content: &str) -> Result<(), PdtkError> {
 /// Write content to a file, optionally creating a `.bak` backup first.
 pub fn write_with_backup(path: &str, content: &str, backup: bool) -> Result<(), PdtkError> {
     if backup {
-        let backup_path = format!("{}.bak", path);
+        let backup_path = format!("{path}.bak");
         if Path::new(path).exists() {
             fs::copy(path, &backup_path)?;
         }
@@ -37,7 +37,7 @@ pub fn scan_pd_files(path: &str) -> Result<Vec<PathBuf>, PdtkError> {
     let mut files = Vec::new();
     for entry in walkdir::WalkDir::new(p).into_iter().filter_map(Result::ok) {
         let ep = entry.path();
-        if ep.is_file() && ep.extension().map(|e| e == "pd").unwrap_or(false) {
+        if ep.is_file() && ep.extension().is_some_and(|e| e == "pd") {
             files.push(ep.to_path_buf());
         }
     }

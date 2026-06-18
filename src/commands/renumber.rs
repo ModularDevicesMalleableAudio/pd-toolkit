@@ -1,9 +1,9 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::parse;
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::parse;
+use pdtk::rewrite::serialize;
 
 pub fn run(
     file: &str,
@@ -20,7 +20,7 @@ pub fn run(
     let internal_depth = depth + 1;
 
     // Shift connection indices at this depth where src >= from or dst >= from
-    for e in patch.entries.iter_mut() {
+    for e in &mut patch.entries {
         if e.kind != EntryKind::Connect || e.depth != internal_depth {
             continue;
         }
@@ -49,10 +49,10 @@ pub fn run(
         };
 
         if src >= from as i64 {
-            src += delta as i64;
+            src += i64::from(delta);
         }
         if dst >= from as i64 {
-            dst += delta as i64;
+            dst += i64::from(delta);
         }
 
         // Clamp to 0 minimum (negative indices are invalid)

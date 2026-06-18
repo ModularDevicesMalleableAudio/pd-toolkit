@@ -160,7 +160,7 @@ pub enum Commands {
         /// Cross-reference sends and receives; report orphans, dead receives, and broadcasts
         #[arg(long, help = "Cross-reference sends and receives")]
         send_receive: bool,
-        /// Warn about message-order-dependent control fan-outs (consider [trigger])
+        /// Warn about message-order-dependent control fan-outs (consider \[trigger\])
         #[arg(
             long,
             help = "Warn about control fan-outs without [trigger]. Heuristic: skips sources whose class ends in ~. Mixed-rate tilde objects (snapshot~ etc.) may be false negatives."
@@ -375,6 +375,18 @@ pub enum Commands {
         /// Output results as JSON
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+        /// Follow send/receive bus connections in addition to wires.
+        ///
+        /// Bus matching is per-canvas and per-namespace (`s`/`r`,
+        /// `s~`/`r~`, `throw~`/`catch~` are disjoint). Names beginning
+        /// with `$0-` are flagged `scope_warning: dollar-zero-scoped`
+        /// because static analysis can produce false positives across
+        /// subpatch instances. Default behavior follows wire edges only.
+        #[arg(
+            long,
+            help = "Follow send/receive bus connections in addition to wires"
+        )]
+        show_bus_hops: bool,
     },
 
     /// Structural diff between two patches
@@ -434,6 +446,22 @@ pub enum Commands {
         /// Append best-effort common Pd external locations for the host platform (Linux / macOS). Best-effort fallback, not a reproduction of Pd's exact resolution.
         #[arg(long = "pd-path", help = "Append common Pd external locations")]
         pd_path: bool,
+        /// Report send/receive bus pairs instead of (or in addition to)
+        /// abstraction dependencies.
+        ///
+        /// Bus matching is per-canvas and per-namespace (`s`/`r`,
+        /// `s~`/`r~`, `throw~`/`catch~` are disjoint). Names starting
+        /// with `$0-` are flagged as scope-warning because static
+        /// analysis can produce false positives across subpatch
+        /// instances.
+        #[arg(long, help = "Report bus (send/receive) dependencies")]
+        buses: bool,
+        /// When `--buses` is set and the target is a directory,
+        /// aggregate buses per-file instead of merging by name across
+        /// the directory. Use this if files are independent patches
+        /// that happen to share bus names.
+        #[arg(long, help = "Scope bus aggregation per-file in directory mode")]
+        per_file: bool,
     },
 
     // Editing

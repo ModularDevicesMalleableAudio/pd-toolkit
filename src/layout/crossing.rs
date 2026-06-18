@@ -7,6 +7,7 @@ use crate::layout::graph::LayoutGraph;
 
 /// Given the layer assignment, group nodes by layer.
 /// Returns a `Vec<Vec<usize>>` where `result\[layer\]` is the ordered list of node ids.
+#[must_use]
 pub fn group_by_layer(layers: &[usize]) -> Vec<Vec<usize>> {
     if layers.is_empty() {
         return Vec::new();
@@ -21,6 +22,7 @@ pub fn group_by_layer(layers: &[usize]) -> Vec<Vec<usize>> {
 
 /// Run barycenter median reordering for `passes` iterations.
 /// Returns an updated `Vec<Vec<usize>>` with nodes sorted within each layer.
+#[must_use]
 pub fn reorder(graph: &LayoutGraph, groups: Vec<Vec<usize>>, passes: usize) -> Vec<Vec<usize>> {
     if groups.is_empty() {
         return groups;

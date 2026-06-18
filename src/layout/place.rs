@@ -11,12 +11,13 @@ const PADDING: i32 = 4; // horizontal padding each side
 const MIN_WIDTH: i32 = 25; // minimum box width
 
 /// Estimate the display width (pixels) of an object box.
+#[must_use]
 pub fn estimate_width(entry: &Entry) -> i32 {
     use crate::model::EntryKind;
 
     match entry.kind {
         // Floatatom: width is encoded as the third token (#X floatatom X Y W ...)
-        EntryKind::FloatAtom | EntryKind::SymbolAtom => {
+        EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => {
             let parts: Vec<&str> = entry.raw.split_whitespace().collect();
             if let Some(w) = parts.get(4)
                 && let Ok(n) = w.parse::<i32>()
@@ -136,6 +137,7 @@ fn snap(v: i32, grid: i32) -> i32 {
 /// - layout options
 ///
 /// Returns a `Vec<(i32, i32)>` indexed by node id.
+#[must_use]
 pub fn place_nodes(groups: &[Vec<usize>], widths: &[i32], opts: &LayoutOptions) -> Vec<(i32, i32)> {
     let n = widths.len();
     let mut coords = vec![(opts.margin, opts.margin); n];
@@ -171,6 +173,7 @@ pub fn place_nodes(groups: &[Vec<usize>], widths: &[i32], opts: &LayoutOptions) 
 
 /// Returns `true` if any two bounding boxes at the same layer overlap
 /// horizontally (they can't overlap vertically because layers are stacked).
+#[must_use]
 pub fn has_overlaps(groups: &[Vec<usize>], coords: &[(i32, i32)], widths: &[i32]) -> bool {
     for layer in groups {
         let mut boxes: Vec<(i32, i32)> = layer
@@ -201,6 +204,7 @@ mod tests {
             kind: EntryKind::Obj,
             depth: 1,
             object_index: Some(0),
+            canvas_id: Some(0),
         }
     }
 
@@ -210,6 +214,7 @@ mod tests {
             kind: EntryKind::FloatAtom,
             depth: 1,
             object_index: Some(0),
+            canvas_id: Some(0),
         }
     }
 
@@ -230,6 +235,7 @@ mod tests {
             kind: EntryKind::Obj,
             depth: 1,
             object_index: Some(0),
+            canvas_id: Some(0),
         };
         let w = estimate_width(&e);
         assert_eq!(w, 12 * CHAR_WIDTH + PADDING * 2);

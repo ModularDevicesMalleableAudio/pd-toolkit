@@ -1,0 +1,9 @@
+#N canvas 0 22 500 300 12;
+#X obj 50 50 loadbang;
+#X msg 50 100 1 2 3 4 5;
+#X listbox 50 150 20 0 0 0 - list_recv list_label;
+#X listbox 50 200 20 0 0 0 list_send - -;
+#X obj 50 250 print listout;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 3 0 4 0;

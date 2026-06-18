@@ -1,5 +1,5 @@
 use crate::errors::PdtkError;
-use pd_toolkit::parser::parse;
+use pdtk::parser::parse;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]

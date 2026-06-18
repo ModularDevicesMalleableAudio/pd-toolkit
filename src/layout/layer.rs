@@ -11,6 +11,7 @@ use crate::layout::graph::LayoutGraph;
 ///
 /// The returned `Vec<usize>` has `graph.node_count` entries; `result[i]` is the
 /// layer of node `i`.
+#[must_use]
 pub fn assign_layers(graph: &LayoutGraph) -> Vec<usize> {
     let n = graph.node_count;
     if n == 0 {

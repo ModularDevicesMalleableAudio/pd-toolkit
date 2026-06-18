@@ -1,10 +1,11 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::escape::unescape_pd_token;
-use pd_toolkit::parser::parse;
+use pdtk::model::EntryKind;
+use pdtk::parser::escape::unescape_pd_token;
+use pdtk::parser::parse;
 use serde_json::{Number, Value, json};
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::path::Path;
 
 /// Schema version emitted by `pdtk arrays`.
@@ -143,7 +144,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
     // not `.pd`, and emit an empty list with exit 0.
     if files.len() == 1 {
         let p = &files[0];
-        let is_pd = p.extension().map(|e| e == "pd").unwrap_or(false);
+        let is_pd = p.extension().is_some_and(|e| e == "pd");
         if !is_pd && Path::new(target).is_file() {
             if cfg.verbose {
                 eprintln!("warning: {}: not a .pd file, skipped", p.display());
@@ -181,7 +182,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                             DefineParse::Row(row) => rows.push(row),
                             DefineParse::Malformed(msg) => {
                                 if cfg.verbose {
-                                    eprintln!("warning: {}: {}", file_str, msg);
+                                    eprintln!("warning: {file_str}: {msg}");
                                 }
                             }
                         }
@@ -339,7 +340,7 @@ fn parse_define(
                     // remainder as an unknown-flag stop (cannot guess arity).
                     payload.discarded.push(Discarded {
                         reason: "unknown_flag".to_string(),
-                        tokens: flag_toks[i..].iter().map(|s| s.to_string()).collect(),
+                        tokens: flag_toks[i..].iter().map(ToString::to_string).collect(),
                     });
                     break;
                 }
@@ -408,7 +409,7 @@ fn parse_define(
                     }
                     _ => {
                         payload.discarded.push(Discarded {
-                            reason: format!("malformed_{}", kind_name),
+                            reason: format!("malformed_{kind_name}"),
                             tokens: vec![tok.to_string(), a.to_string(), b.to_string()],
                         });
                         if verbose {
@@ -428,7 +429,7 @@ fn parse_define(
                 // and stop parsing flags.
                 payload.discarded.push(Discarded {
                     reason: "unknown_flag".to_string(),
-                    tokens: flag_toks[i..].iter().map(|s| s.to_string()).collect(),
+                    tokens: flag_toks[i..].iter().map(ToString::to_string).collect(),
                 });
                 if verbose {
                     eprintln!(
@@ -646,16 +647,17 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
         Schema::V1 => {
             // Historic format: `<file> [depth:N] array <name> size <size>`
             for r in rows.iter().filter(|r| r.kind == RowKind::Classic) {
-                out.push_str(&format!(
-                    "{} [depth:{}] array {} size {}\n",
+                let _ = writeln!(
+                    out,
+                    "{} [depth:{}] array {} size {}",
                     r.file, r.depth, r.name, r.size
-                ));
+                );
             }
             let dups = collect_duplicates_v1(rows);
             if !dups.is_empty() {
                 out.push_str("Duplicate array names:\n");
                 for (name, files) in dups {
-                    out.push_str(&format!("- {}: {}\n", name, files.join(", ")));
+                    let _ = writeln!(out, "- {}: {}", name, files.join(", "));
                 }
             }
         }
@@ -678,7 +680,7 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
                         tail.push("hidename".to_string());
                     }
                     if !tail.is_empty() {
-                        line.push_str(&format!(" ({})", tail.join(", ")));
+                        let _ = write!(line, " ({})", tail.join(", "));
                     }
                 }
                 if let Some(d) = &r.define {
@@ -686,10 +688,10 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
                         line.push_str(" -k");
                     }
                     if let Some(p) = &d.yrange {
-                        line.push_str(&format!(" -yrange {} {}", p[0], p[1]));
+                        let _ = write!(line, " -yrange {} {}", p[0], p[1]);
                     }
                     if let Some(p) = &d.pix {
-                        line.push_str(&format!(" -pix {} {}", p[0], p[1]));
+                        let _ = write!(line, " -pix {} {}", p[0], p[1]);
                     }
                 }
                 out.push_str(&line);
@@ -701,9 +703,9 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
                 for (name, entries) in dups {
                     let parts: Vec<String> = entries
                         .iter()
-                        .map(|(file, kind)| format!("{} [{}]", file, kind))
+                        .map(|(file, kind)| format!("{file} [{kind}]"))
                         .collect();
-                    out.push_str(&format!("- {}: {}\n", name, parts.join(", ")));
+                    let _ = writeln!(out, "- {}: {}", name, parts.join(", "));
                 }
             }
         }

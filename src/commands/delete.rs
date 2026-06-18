@@ -1,9 +1,9 @@
 use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::EntryKind;
-use pd_toolkit::parser::{assign_depth_and_indices, build_entries, tokenize_entries};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::EntryKind;
+use pdtk::parser::{assign_depth_and_indices, build_entries, tokenize_entries};
+use pdtk::rewrite::serialize;
 
 /// Run the `delete` command.
 ///
@@ -77,7 +77,7 @@ pub fn run(
     });
 
     // Renumber: src/dst > target_index → -1
-    for e in entries.iter_mut() {
+    for e in &mut *entries {
         if e.kind != EntryKind::Connect || e.depth != connection_depth {
             continue;
         }
@@ -113,13 +113,13 @@ pub fn run(
 
     assign_depth_and_indices(&mut entries);
 
-    let patch = pd_toolkit::model::Patch {
+    let patch = pdtk::model::Patch {
         entries,
         warnings: Vec::new(),
     };
     let serialized = serialize(&patch);
 
-    let errors = validate_patch(&pd_toolkit::parser::parse(&serialized)?);
+    let errors = validate_patch(&pdtk::parser::parse(&serialized)?);
     if !errors.is_empty() {
         return Err(PdtkError::Usage(format!(
             "validation failed after delete: {}",
@@ -139,7 +139,7 @@ pub fn run(
 /// Find the span for the default (non-subpatch) delete path.
 /// Returns `(span_start, delete_pos, target_index, connection_depth)`.
 fn find_object_span(
-    entries: &[pd_toolkit::model::Entry],
+    entries: &[pdtk::model::Entry],
     user_depth: usize,
     index: usize,
 ) -> Result<(usize, usize, usize, usize), PdtkError> {
@@ -185,7 +185,7 @@ fn find_object_span(
 /// Find the span for the `--subpatch` path.
 /// Returns `(span_start, delete_pos, target_index, connection_depth)`.
 fn find_subpatch_span(
-    entries: &[pd_toolkit::model::Entry],
+    entries: &[pdtk::model::Entry],
     user_depth: usize,
     n: usize,
 ) -> Result<(usize, usize, usize, usize), PdtkError> {

@@ -1,15 +1,16 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::layout::place::estimate_width;
-use pd_toolkit::layout::{
+use pdtk::layout::place::estimate_width;
+use pdtk::layout::{
     crossing::{group_by_layer, reorder},
     graph::LayoutGraph,
     layer::assign_layers,
     place::place_nodes,
 };
-use pd_toolkit::model::{Connection, EntryKind};
-use pd_toolkit::parser::parse;
+use pdtk::model::{Connection, EntryKind};
+use pdtk::parser::parse;
 use serde::Serialize;
+use std::fmt::Write;
 
 #[derive(Debug, Serialize)]
 struct LintReport {
@@ -61,7 +62,8 @@ pub fn run(
         ));
     }
 
-    let mut object_counts: std::collections::HashMap<usize, usize> = Default::default();
+    let mut object_counts: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::default();
     for e in &patch.entries {
         if e.object_index.is_some() {
             *object_counts.entry(e.depth).or_insert(0) += 1;
@@ -95,7 +97,7 @@ pub fn run(
             continue;
         }
 
-        let opts = pd_toolkit::layout::place::LayoutOptions::default();
+        let opts = pdtk::layout::place::LayoutOptions::default();
         let mut widths = vec![25i32; g.node_count];
         for e in &patch.entries {
             if e.depth == internal
@@ -126,7 +128,8 @@ pub fn run(
         let actual_groups: Vec<Vec<usize>> = ordered.clone();
 
         // Use real x-coordinates to check for overlap
-        let mut by_layer: std::collections::HashMap<i32, Vec<usize>> = Default::default();
+        let mut by_layer: std::collections::HashMap<i32, Vec<usize>> =
+            std::collections::HashMap::default();
         for e in &patch.entries {
             if e.depth == internal
                 && let Some(idx) = e.object_index
@@ -149,8 +152,7 @@ pub fn run(
                         by_layer
                             .iter()
                             .find(|(_, v)| v.contains(&row[0]))
-                            .map(|(y, _)| *y)
-                            .unwrap_or(0)
+                            .map_or(0, |(y, _)| *y)
                     ));
                     break;
                 }
@@ -173,7 +175,7 @@ pub fn run(
     }
 
     let valid = errors.is_empty();
-    let exit_code = if valid { 0 } else { 1 };
+    let exit_code = i32::from(!valid);
 
     let report = LintReport {
         valid,
@@ -196,13 +198,13 @@ pub fn run(
     };
 
     for e in &errors {
-        out.push_str(&format!("  ERROR: {e}\n"));
+        let _ = writeln!(out, "  ERROR: {e}");
     }
     for w in &warnings {
-        out.push_str(&format!("  WARN: {w}\n"));
+        let _ = writeln!(out, "  WARN: {w}");
     }
     for s in &style {
-        out.push_str(&format!("  STYLE: {s}\n"));
+        let _ = writeln!(out, "  STYLE: {s}");
     }
 
     Ok(LintResult {
@@ -211,31 +213,42 @@ pub fn run(
     })
 }
 
-fn run_send_receive_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
-    use pd_toolkit::analysis::send_receive::{collect_receives, collect_sends, format_locations};
+fn run_send_receive_lint(patch: &pdtk::model::Patch, style: &mut Vec<String>) {
+    use pdtk::analysis::send_receive::{collect_receives, collect_sends, format_locations};
     let sends = collect_sends(&patch.entries);
     let receives = collect_receives(&patch.entries);
 
-    for (name, locs) in &sends {
-        if !receives.contains_key(name) {
+    let kind_label = |k: &pdtk::analysis::send_receive::BusKind| match k {
+        pdtk::analysis::send_receive::BusKind::Control => "control",
+        pdtk::analysis::send_receive::BusKind::Signal => "signal",
+        pdtk::analysis::send_receive::BusKind::AudioSum => "audio_sum",
+    };
+    for (key, locs) in &sends {
+        if !receives.contains_key(key) {
+            let (k, name) = key;
             style.push(format!(
-                "orphan send: '{name}' at {} — no matching receive",
+                "orphan send: '{name}' ({}) at {} — no matching receive",
+                kind_label(k),
                 format_locations(locs)
             ));
         }
     }
-    for (name, locs) in &receives {
-        if !sends.contains_key(name) {
+    for (key, locs) in &receives {
+        if !sends.contains_key(key) {
+            let (k, name) = key;
             style.push(format!(
-                "dead receive: '{name}' at {} — no matching send",
+                "dead receive: '{name}' ({}) at {} — no matching send",
+                kind_label(k),
                 format_locations(locs)
             ));
         }
     }
-    for (name, locs) in &receives {
+    for (key, locs) in &receives {
         if locs.len() > 1 {
+            let (k, name) = key;
             style.push(format!(
-                "broadcast receive: '{name}' has {} receivers at {}",
+                "broadcast receive: '{name}' ({}) has {} receivers at {}",
+                kind_label(k),
                 locs.len(),
                 format_locations(locs)
             ));
@@ -243,7 +256,7 @@ fn run_send_receive_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<Strin
     }
 }
 
-fn run_fan_out_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
+fn run_fan_out_lint(patch: &pdtk::model::Patch, style: &mut Vec<String>) {
     use std::collections::HashMap;
     // For each depth, group connections by (src, src_outlet) and report
     // groups of >= 2 destinations whose source is non-signal.
@@ -270,7 +283,7 @@ fn run_fan_out_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
         }
         let mut sorted: Vec<((usize, usize), usize)> =
             groups.into_iter().filter(|(_, c)| *c > 1).collect();
-        sorted.sort();
+        sorted.sort_unstable();
         for ((src, outlet), count) in sorted {
             if let Some((kind, class)) = src_class.get(&src)
                 && *kind == EntryKind::Obj
@@ -285,7 +298,7 @@ fn run_fan_out_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
     }
 }
 
-fn run_dsp_loop_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) {
+fn run_dsp_loop_lint(patch: &pdtk::model::Patch, style: &mut Vec<String>) {
     use petgraph::algo::tarjan_scc;
     use petgraph::graph::{DiGraph, NodeIndex};
     use std::collections::HashMap;
@@ -332,10 +345,10 @@ fn run_dsp_loop_lint(patch: &pd_toolkit::model::Patch, style: &mut Vec<String>) 
                 continue;
             }
             let mut indices: Vec<usize> = scc.iter().map(|n| *g.node_weight(*n).unwrap()).collect();
-            indices.sort();
+            indices.sort_unstable();
             let list = indices
                 .iter()
-                .map(|i| i.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
             style.push(format!(

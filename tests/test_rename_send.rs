@@ -297,3 +297,68 @@ fn rename_send_validates_after_mutation() {
     let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(v.status.code(), Some(0));
 }
+
+#[test]
+fn rename_send_handles_hdl_vdl_compat_radios() {
+    // hdl and vdl are old-compat names for hradio/vradio; same arg layout.
+    let (tmp, _) = with_copy("radio_compat_hdl_vdl.pd");
+
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "hdl_send",
+        "--to",
+        "hdl_renamed",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("hdl_renamed"));
+    assert!(!result.contains("hdl_send"));
+
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "vdl_recv",
+        "--to",
+        "vdl_recv_renamed",
+        "--in-place",
+    ]);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("vdl_recv_renamed"));
+}
+
+#[test]
+fn rename_send_handles_listbox_send_field() {
+    let (tmp, _) = with_copy("listbox_send_receive.pd");
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "list_send",
+        "--to",
+        "list_send_renamed",
+        "--in-place",
+    ]);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("list_send_renamed"));
+    assert!(!result.contains(" list_send "));
+}
+
+#[test]
+fn rename_send_handles_listbox_receive_field() {
+    let (tmp, _) = with_copy("listbox_send_receive.pd");
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "list_recv",
+        "--to",
+        "list_recv_renamed",
+        "--in-place",
+    ]);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("list_recv_renamed"));
+}

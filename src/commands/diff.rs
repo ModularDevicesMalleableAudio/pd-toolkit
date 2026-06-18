@@ -1,7 +1,8 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::analysis::diff::diff_patches;
-use pd_toolkit::parser::parse;
+use pdtk::analysis::diff::diff_patches;
+use pdtk::parser::parse;
+use std::fmt::Write;
 
 pub fn run(
     file_a: &str,
@@ -27,63 +28,52 @@ pub fn run(
     let mut out = String::new();
 
     if !result.objects_removed.is_empty() {
-        out.push_str(&format!(
-            "Objects removed: {}\n",
-            result.objects_removed.len()
-        ));
+        let _ = writeln!(out, "Objects removed: {}", result.objects_removed.len());
         for c in &result.objects_removed {
-            out.push_str(&format!(
-                "  - [depth:{} index:{}] {}\n",
-                c.depth, c.index, c.text
-            ));
+            let _ = writeln!(out, "  - [depth:{} index:{}] {}", c.depth, c.index, c.text);
         }
     }
     if !result.objects_added.is_empty() {
-        out.push_str(&format!("Objects added: {}\n", result.objects_added.len()));
+        let _ = writeln!(out, "Objects added: {}", result.objects_added.len());
         for c in &result.objects_added {
-            out.push_str(&format!(
-                "  + [depth:{} index:{}] {}\n",
-                c.depth, c.index, c.text
-            ));
+            let _ = writeln!(out, "  + [depth:{} index:{}] {}", c.depth, c.index, c.text);
         }
     }
     if !result.objects_modified.is_empty() {
-        out.push_str(&format!(
-            "Objects modified: {}\n",
-            result.objects_modified.len()
-        ));
+        let _ = writeln!(out, "Objects modified: {}", result.objects_modified.len());
         for c in &result.objects_modified {
-            out.push_str(&format!(
-                "  ~ [depth:{} index:{}]\n    - {}\n    + {}\n",
+            let _ = writeln!(
+                out,
+                "  ~ [depth:{} index:{}]\n    - {}\n    + {}",
                 c.depth,
                 c.index,
                 c.old_text.as_deref().unwrap_or(""),
                 c.new_text.as_deref().unwrap_or(""),
-            ));
+            );
         }
     }
     if !result.connections_removed.is_empty() {
-        out.push_str(&format!(
-            "Connections removed: {}\n",
+        let _ = writeln!(
+            out,
+            "Connections removed: {}",
             result.connections_removed.len()
-        ));
+        );
         for c in &result.connections_removed {
-            out.push_str(&format!(
-                "  - [depth:{}] {} {} → {} {}\n",
+            let _ = writeln!(
+                out,
+                "  - [depth:{}] {} {} → {} {}",
                 c.depth, c.src, c.src_outlet, c.dst, c.dst_inlet
-            ));
+            );
         }
     }
     if !result.connections_added.is_empty() {
-        out.push_str(&format!(
-            "Connections added: {}\n",
-            result.connections_added.len()
-        ));
+        let _ = writeln!(out, "Connections added: {}", result.connections_added.len());
         for c in &result.connections_added {
-            out.push_str(&format!(
-                "  + [depth:{}] {} {} → {} {}\n",
+            let _ = writeln!(
+                out,
+                "  + [depth:{}] {} {} → {} {}",
                 c.depth, c.src, c.src_outlet, c.dst, c.dst_inlet
-            ));
+            );
         }
     }
 

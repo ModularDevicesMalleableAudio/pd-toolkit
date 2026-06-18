@@ -1,9 +1,10 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pd_toolkit::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
-use pd_toolkit::parser::escape::escape_pd_dollars;
-use pd_toolkit::parser::{build_entries, tokenize_entries};
-use pd_toolkit::rewrite::serialize;
+use pdtk::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
+use pdtk::parser::escape::escape_pd_dollars;
+use pdtk::parser::{build_entries, tokenize_entries};
+use pdtk::rewrite::serialize;
+use std::fmt::Write;
 
 /// Replace the token at `token_pos` (0-based, whitespace-split) in `raw`
 /// with `new_token`, if and only if the existing token (stripped of any
@@ -116,8 +117,8 @@ pub fn rename_in_entry(raw: &str, kind: &EntryKind, from: &str, to: &str) -> Opt
             None
         }
 
-        EntryKind::FloatAtom | EntryKind::SymbolAtom => {
-            // #X floatatom X Y width min max flag send receive label
+        EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => {
+            // #X floatatom/symbolatom/listbox X Y width min max flag send receive label
             // Send = position 8, receive = position 9
             let after_send = replace_raw_token(raw, 8, from, to);
             let base = after_send.as_deref().unwrap_or(raw);
@@ -164,7 +165,7 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                     }
                 }
             }
-            EntryKind::FloatAtom | EntryKind::SymbolAtom => {
+            EntryKind::FloatAtom | EntryKind::SymbolAtom | EntryKind::ListAtom => {
                 for pos in [8, 9] {
                     let toks: Vec<&str> = e.raw.split_whitespace().collect();
                     if let Some(tok) = toks.get(pos) {
@@ -225,7 +226,7 @@ pub fn run(
         let mut entries = build_entries(&tok.entries);
 
         let mut file_replacements = 0usize;
-        for e in entries.iter_mut() {
+        for e in &mut entries {
             if let Some(new_raw) = rename_in_entry(&e.raw, &e.kind, &from_escaped, &to_escaped) {
                 report_lines.push(format!(
                     "{}: {} → {}",
@@ -252,7 +253,7 @@ pub fn run(
                 ));
             }
 
-            let patch = pd_toolkit::model::Patch {
+            let patch = pdtk::model::Patch {
                 entries,
                 warnings: Vec::new(),
             };
@@ -262,15 +263,12 @@ pub fn run(
     }
 
     let mut out = if dry_run {
-        format!(
-            "DRY RUN — {} replacement(s) would be made:\n",
-            total_replacements
-        )
+        format!("DRY RUN — {total_replacements} replacement(s) would be made:\n")
     } else {
-        format!("{} replacement(s) made:\n", total_replacements)
+        format!("{total_replacements} replacement(s) made:\n")
     };
     for line in &report_lines {
-        out.push_str(&format!("  {line}\n"));
+        let _ = writeln!(out, "  {line}");
     }
     Ok(out.trim_end().to_string())
 }
