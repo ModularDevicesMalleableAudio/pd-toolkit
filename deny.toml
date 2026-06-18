@@ -1,0 +1,41 @@
+[graph]
+# Only check the runtime dependency tree (skip dev and build deps).
+exclude-dev = false
+
+# ── Advisories ───────────────────────────────────────────────────────────────
+[advisories]
+# Deny crates with published security vulnerabilities.
+version = 2
+ignore = []
+
+# ── Licences ─────────────────────────────────────────────────────────────────
+[licenses]
+version = 2
+# Acceptable SPDX licence IDs. All runtime deps must use one of these.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "Unlicense",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "Zlib",
+]
+# Confidence threshold for licence text similarity detection.
+confidence-threshold = 0.8
+# Don't warn about licences in the allow-list that no current dep uses.
+unused-allowed-license = "allow"
+
+# ── Bans ─────────────────────────────────────────────────────────────────────
+[bans]
+# Warn when the same crate appears at multiple versions.
+multiple-versions = "warn"
+# Deny crates whose source is not crates.io (git deps, path deps outside the
+# workspace, etc.).  Override per-crate below if needed.
+wildcards = "deny"
+
+# ── Sources ──────────────────────────────────────────────────────────────────
+[sources]
+unknown-registry = "deny"
+unknown-git      = "deny"
+allow-registry   = ["https://github.com/rust-lang/crates.io-index"]

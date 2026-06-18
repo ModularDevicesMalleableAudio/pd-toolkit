@@ -24,3 +24,11 @@ target
 /completions/
 
 .pi/skills/git-conventions
+
+# Local install output from `cargo install --root .tools` (make install-local)
+/.tools/
+
+# Prebuilt release binaries dropped at the repo root
+/pdtk-*-linux
+/pdtk-*-darwin
+/pdtk-*-musl
