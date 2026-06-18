@@ -25,7 +25,9 @@ pdtk search   patch.pd --type send --text "clk*"  # sends whose name starts with
 pdtk find-orphans  patch.pd                     # objects with no connections
 pdtk find-displays patch.pd                     # connected debug number boxes
 pdtk deps     patch.pd --missing                # abstractions not found on disk
+pdtk deps     patch.pd --buses                  # send/receive name pairs by namespace
 pdtk trace    patch.pd --from 0                 # what does object 0 connect to?
+pdtk trace    patch.pd --from 0 --show-bus-hops # follow s/r and s~/r~ across the canvas
 pdtk diff     old.pd new.pd --ignore-coords     # what changed (ignoring layout)?
 
 # Edit safely
@@ -63,9 +65,9 @@ pdtk batch    src/ format --in-place           # auto-format all files
 | **Search** | `search` | Find objects by class name or text pattern (glob/regex) |
 | | `find-orphans` | Objects with zero connections |
 | | `find-displays` | Connected debug display widgets |
-| | `trace` | BFS forward trace or path-find between two objects |
+| | `trace` | BFS forward trace or path-find. `--show-bus-hops` also follows matching `s`/`r` (and `s~`/`r~`, `throw~`/`catch~`) name pairs across the canvas |
 | | `diff` | Structural diff (objects added/removed/modified, cords) |
-| | `deps` | Abstraction dependency list, optionally filtered to missing |
+| | `deps` | Abstraction dependency list. `--buses` reports send/receive name pairs (matched / orphan) split by namespace; `--recursive --buses` reports unsatisfied cross-file bus contracts |
 | **Editing** | `insert` | Insert object, renumber connections automatically |
 | | `delete` | Delete object and its cords, renumber remaining |
 | | `modify` | Change class/args in place, preserving index and connections |
@@ -157,9 +159,15 @@ pdtk extract sequencer.pd --depth 1 --output step_counter.pd --in-place
 
 ## Install
 
+### From crates.io
+
+```sh
+cargo install pdtk
+```
+
 ### Build from source
 
-Requires Rust stable (≥ 1.77):
+Requires Rust stable (≥ 1.87):
 
 ```sh
 git clone https://github.com/ModularDevicesMalleableAudio/pd-toolkit
@@ -187,14 +195,17 @@ pdtk completions fish > ~/.config/fish/completions/pdtk.fish
 
 ## Man pages
 
-Man pages are generated into `man/` by `build.rs` when you run `cargo build`.
-They are not committed to the repository.
+`build.rs` generates man pages on every `cargo build`, writing them into
+Cargo's `OUT_DIR` (so that `cargo publish` accepts the crate).  Use
+`make man` to stage them into `./man/` for local viewing or packaging:
 
 ```sh
-cargo build                   # generates man/ if it doesn't exist yet
+make man                      # stages target/.../out/man/*.1 into ./man/
 man -l man/pdtk.1             # top-level man page
 man -l man/pdtk-format.1      # per-command page
 ```
+
+`make install` and `make install-local` invoke `make man` automatically.
 
 ---
 

@@ -1,10 +1,32 @@
 [package]
-name = "pd-toolkit"
-version = "0.3.0"
+name = "pdtk"
+version = "0.4.0"
 edition = "2024"
+rust-version = "1.87"
 description = "Safe structural editing, validation, & analysis for Pure Data .pd patch files 🦀"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/ModularDevicesMalleableAudio/pd-toolkit"
+homepage = "https://github.com/ModularDevicesMalleableAudio/pd-toolkit"
+documentation = "https://docs.rs/pdtk"
+authors = ["Modular Devices Malleable Audio <modular.devices.malleable.audio@gmail.com>"]
+keywords = ["pure-data", "puredata", "pd", "patch", "audio"]
+categories = ["command-line-utilities", "multimedia::audio", "parser-implementations"]
+
+# Keep the published tarball lean: drop prebuilt binaries, design docs,
+# and developer-only assets that crate users do not need.
+exclude = [
+    ".tools/",
+    "pdtk-x86_64-linux",
+    "docs/",
+    "skills/",
+    "AGENTS.md",
+    "array-define.txt",
+    "deviations.md",
+    "escaping-args.md",
+    "send-following.md",
+    "structured-array-list.md",
+]
 
 [[bin]]
 name = "pdtk"
@@ -35,9 +57,6 @@ walkdir = "2"
 # Diff algorithm (LCS for structural diff)
 similar = "2"
 
-# Parallel batch processing (optional feature)
-rayon = "1"
-
 # Shell completion generation (runtime subcommand)
 clap_complete = "4"
 
@@ -64,6 +83,28 @@ clap_complete = "4"
 
 # Needed for build.rs to access the CLI struct
 clap = { version = "4", features = ["derive", "string"] }
+
+[lints.clippy]
+# Opt in to pedantic lints
+pedantic = { level = "warn", priority = -1 }
+# Structural / design choices we keep as-is
+too_many_lines            = "allow"
+fn_params_excessive_bools = "allow"
+struct_excessive_bools    = "allow"
+needless_pass_by_value    = "allow"
+cast_possible_wrap        = "allow"
+cast_possible_truncation  = "allow"
+cast_precision_loss       = "allow"
+similar_names             = "allow"
+implicit_hasher           = "allow"
+missing_panics_doc        = "allow"
+missing_errors_doc        = "allow"
+index_refutable_slice     = "allow"
+manual_midpoint           = "allow"
+single_match_else         = "allow"
+match_same_arms           = "allow"
+redundant_else            = "allow"
+doc_markdown              = "allow"
 
 [profile.release]
 opt-level = 3

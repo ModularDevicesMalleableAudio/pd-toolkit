@@ -1,18 +1,24 @@
-/// Build script: generate man pages in man/ using clap_mangen.
+/// Build script: generate man pages with `clap_mangen`.
 ///
-/// Generates:
-///   man/pdtk.1         — top-level man page
-///   man/pdtk-<cmd>.1   — one per subcommand
+/// Generates inside Cargo's `OUT_DIR`:
+///   $OUT_DIR/man/pdtk.1         — top-level man page
+///   $OUT_DIR/man/pdtk-<cmd>.1   — one per subcommand
 ///
-/// The man/ directory is listed in .gitignore; it is regenerated on every
-/// `cargo build`.  Man pages are always in sync with the --help text because
-/// they are derived from the same clap Command definition.
+/// Writing to `OUT_DIR` (rather than the source tree) is required for
+/// `cargo publish`, which refuses to package a crate whose build script
+/// mutates anything outside `OUT_DIR`.  Installer / packaging targets in
+/// the Makefile locate the generated files via `find target -name 'pdtk*.1'`.
+///
+/// Man pages are always in sync with the --help text because they are
+/// derived from the same clap Command definition.
 fn main() -> std::io::Result<()> {
     // Tell Cargo to re-run this script only when the CLI source changes.
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/cli.rs");
 
-    let man_dir = std::path::PathBuf::from("man");
+    let out_dir = std::env::var_os("OUT_DIR")
+        .ok_or_else(|| std::io::Error::other("OUT_DIR not set by cargo"))?;
+    let man_dir = std::path::PathBuf::from(out_dir).join("man");
     std::fs::create_dir_all(&man_dir)?;
 
     let cmd = build_root_command();
@@ -22,6 +28,9 @@ fn main() -> std::io::Result<()> {
         let name = format!("pdtk-{}", sub.get_name());
         write_man_page(sub, &man_dir, &name)?;
     }
+
+    // Expose the man-page directory to downstream tooling (Makefile etc.).
+    println!("cargo:man-dir={}", man_dir.display());
 
     Ok(())
 }
@@ -36,6 +45,7 @@ fn write_man_page(cmd: &clap::Command, dir: &std::path::Path, name: &str) -> std
 
 // Minimal Command tree — mirrors src/cli.rs without the derive macro so that
 // build.rs can compile independently of the binary's error/io modules.
+#[allow(clippy::too_many_lines)]
 fn build_root_command() -> clap::Command {
     use clap::{Arg, Command};
 
