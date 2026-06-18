@@ -1,5 +1,9 @@
 # pdtk — Pure Data Patch Toolkit
 
+[![crates.io](https://img.shields.io/crates/v/pdtk.svg)](https://crates.io/crates/pdtk)
+[![docs.rs](https://img.shields.io/docsrs/pdtk)](https://docs.rs/pdtk)
+[![license](https://img.shields.io/crates/l/pdtk.svg)](https://github.com/ModularDevicesMalleableAudio/pd-toolkit/blob/main/LICENSE)
+
 A safe, fast command-line tool for parsing, inspecting, editing, validating,
 and auto-formatting Pure Data (`.pd`) patch files — without breaking
 connections.
