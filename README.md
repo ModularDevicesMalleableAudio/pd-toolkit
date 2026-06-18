@@ -1,4 +1,4 @@
-# pdtk — Pure Data Patch Toolkit
+# pdtk — Pure Data Toolkit
 
 [![crates.io](https://img.shields.io/crates/v/pdtk.svg)](https://crates.io/crates/pdtk)
 [![docs.rs](https://img.shields.io/docsrs/pdtk)](https://docs.rs/pdtk)
@@ -21,36 +21,45 @@ modified unless explicitly requested with `--in-place`.
 pdtk parse    patch.pd           # object count, depth, warnings
 pdtk list     patch.pd           # [depth:index] class args for every object
 pdtk validate patch.pd           # check all connection indices are in range
+pdtk validate patch.pd --strict  # also warn on duplicate connections
 pdtk stats    patch.pd           # fan-in, fan-out, class histogram
 
 # Find things
 pdtk search   patch.pd --type route             # find all route objects
 pdtk search   patch.pd --type send --text "clk*"  # sends whose name starts with clk
+pdtk search   src/ --regex --text "trig_\\d+"     # regex across a tree
 pdtk find-orphans  patch.pd                     # objects with no connections
 pdtk find-displays patch.pd                     # connected debug number boxes
 pdtk deps     patch.pd --missing                # abstractions not found on disk
 pdtk deps     patch.pd --buses                  # send/receive name pairs by namespace
+pdtk deps     src/  --recursive --buses         # cross-file unsatisfied bus contracts
 pdtk trace    patch.pd --from 0                 # what does object 0 connect to?
-pdtk trace    patch.pd --from 0 --show-bus-hops # follow s/r and s~/r~ across the canvas
+pdtk trace    patch.pd --from 0 --show-bus-hops # also follow s/r and s~/r~ pairs
 pdtk diff     old.pd new.pd --ignore-coords     # what changed (ignoring layout)?
+
+# Lint (combined structural + opt-in heuristics)
+pdtk lint     patch.pd                                       # validate + overlap check
+pdtk lint     patch.pd --send-receive --fan-out --dsp-loop   # all heuristics
 
 # Edit safely
 pdtk insert   patch.pd --depth 0 --index 2 --entry '#X obj 50 75 bang;' --in-place
 pdtk delete   patch.pd --depth 0 --index 5 --in-place
+pdtk delete   patch.pd --depth 1 --subpatch --in-place         # remove whole subpatch
 pdtk modify   patch.pd --depth 0 --index 3 --text 'route 1 2 3' --in-place
 pdtk connect  patch.pd --depth 0 --src 0 --outlet 0 --dst 2 --inlet 0 --in-place
 pdtk rename-send patch.pd --from clock_main --to clock_renamed --in-place
 
 # Layout
 pdtk format   patch.pd --in-place              # auto-reposition objects
-pdtk lint     patch.pd                         # validate + detect overlaps
+pdtk format   patch.pd --grid 20 --hpad 15 --margin 30 --dry-run
 
 # Subpatch operations
 pdtk extract  patch.pd --depth 1 --output my_abs.pd --in-place
 
 # Batch
-pdtk batch    src/ validate                    # validate all .pd files in src/
-pdtk batch    src/ format --in-place           # auto-format all files
+pdtk batch    src/ validate                                   # validate every .pd
+pdtk batch    src/ --continue-on-error --json validate        # CI-friendly
+pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 ```
 
 ---
@@ -61,28 +70,90 @@ pdtk batch    src/ format --in-place           # auto-format all files
 |---|---|---|
 | **Inspection** | `parse` | Object count, connection count, depth, warnings |
 | | `list` | List every indexed object with address and class |
-| | `validate` | Check connection index ranges and canvas balance |
-| | `lint` | Validate + detect bounding-box overlaps |
-| | `stats` | Per-file metrics: fan-in/out, class histogram, orphans |
+| | `validate` | Check connection index ranges and canvas balance. `--strict` also warns on duplicate connections |
+| | `lint` | Validate + layout overlap detection. Opt-in heuristics: `--send-receive`, `--fan-out`, `--dsp-loop` (see [Lint checks](#lint-checks)) |
+| | `stats` | Per-file metrics: fan-in/out, class histogram, orphans. Aggregates across all files in directory mode |
 | | `connections` | List all patch cords to/from one object |
-| | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, and duplicate detection (schema v2) |
-| **Search** | `search` | Find objects by class name or text pattern (glob/regex) |
-| | `find-orphans` | Objects with zero connections |
-| | `find-displays` | Connected debug display widgets |
-| | `trace` | BFS forward trace or path-find. `--show-bus-hops` also follows matching `s`/`r` (and `s~`/`r~`, `throw~`/`catch~`) name pairs across the canvas |
-| | `diff` | Structural diff (objects added/removed/modified, cords) |
-| | `deps` | Abstraction dependency list. `--buses` reports send/receive name pairs (matched / orphan) split by namespace; `--recursive --buses` reports unsatisfied cross-file bus contracts |
+| | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, duplicate detection. `--kind classic\|define\|all`, `--templates include\|exclude\|only`, `--schema 1\|2` |
+| **Search** | `search` | Find objects by class (`--type`) and/or text (`--text`, glob by default, `--regex` for regex). `--case-sensitive`, `--depth` |
+| | `find-orphans` | Objects with zero connections. `--delete --in-place` removes them; `--include-comments` includes `#X text` |
+| | `find-displays` | Connected debug display widgets (floatatom/symbolatom/nbx/vu). `--include-unconnected`, `--include-labels`, `--delete` |
+| | `trace` | BFS forward trace or path-find. `--show-bus-hops` also follows matching `s`/`r`, `s~`/`r~`, `throw~`/`catch~` pairs within each canvas, respecting the three bus namespaces (see [Send/receive buses](#sendreceive-buses)) |
+| | `diff` | Structural diff (objects added/removed/modified, cords). `--ignore-coords` is the pairing for `format` diffs |
+| | `deps` | Abstraction dependency list. `--missing`, `--recursive`, `--search-path DIR` (repeatable fallback), `--pd-path` (append common external locations), `--buses` (bus pairs by namespace; with `--recursive` reports unsatisfied cross-file contracts), `--per-file` (don't merge bus names across files) |
 | **Editing** | `insert` | Insert object, renumber connections automatically |
-| | `delete` | Delete object and its cords, renumber remaining |
-| | `modify` | Change class/args in place, preserving index and connections |
+| | `delete` | Delete an object (`--index`) or an entire subpatch (`--subpatch`); cords are removed and remaining ones renumbered |
+| | `modify` | Change class/args in place, preserving index and connections. Auto-escapes `\$N`/`\;`/`\,` in user input |
 | | `connect` | Add a patch cord (refuses duplicates and out-of-range) |
 | | `disconnect` | Remove a specific patch cord |
 | | `renumber` | Manually shift connection indices by a delta |
-| | `rename-send` | Rename s/r pairs atomically, including GUI fields |
-| **Layout** | `format` | Auto-reposition objects (connections byte-identical) |
-| **Subpatch** | `extract` | Extract subpatch into standalone abstraction |
-| **Utilities** | `batch` | Apply any command recursively across a directory |
+| | `rename-send` | Rename s/r pairs atomically across files, including GUI fields. `--dry-run`, `--force` (override target-exists check) |
+| **Layout** | `format` | Auto-reposition objects (connections byte-identical). `--grid`, `--hpad`, `--margin`, `--depth`, `--dry-run` |
+| **Subpatch** | `extract` | Extract subpatch into standalone abstraction. Inlet/outlet count inferred from connections crossing the boundary |
+| **Utilities** | `batch` | Apply any command recursively across `.pd` files. `--glob`, `--continue-on-error`, `--dry-run` |
 | | `completions` | Generate shell tab-completion scripts |
+
+Almost every command accepts `--json` for machine-readable output, and most
+non-mutating commands accept `--output PATH` to write to a file instead of
+stdout. See `pdtk <cmd> --help` for the full per-command flag set; every
+command also has a man page (see [Man pages](#man-pages)).
+
+---
+
+## Send/receive buses
+
+pdtk models PD's three disjoint bus namespaces — they share names but never
+route to each other at runtime:
+
+| Namespace   | Senders                          | Receivers              |
+|-------------|----------------------------------|------------------------|
+| `control`   | `s` / `send` + GUI send fields   | `r` / `receive`        |
+| `signal`    | `s~` / `send~`                   | `r~` / `receive~`      |
+| `audio_sum` | `throw~` (sums into one `catch~`)| `catch~`               |
+
+`trace --show-bus-hops` and `deps --buses` follow bus connections respecting
+this split. A `[s foo]` and `[s~ foo]` are never reported as connected.
+
+```
+$ pdtk trace patch.pd --from 0 --show-bus-hops
+Forward trace from index 0 at depth 0:
+  hop 1: [index:1] #X obj 50 100 s foo; (via outlet 0 → inlet 0 from index 0)
+  hop 2: [index:2] #X obj 50 200 r foo; (via bus "foo" (control) from index 1)
+  hop 3: [index:3] #X obj 50 250 print downstream; (via outlet 0 → inlet 0 from index 2)
+```
+
+Bus matching is **per-canvas**: sibling subpatches at the same depth get
+their own namespaces, matching PD's runtime scoping.
+
+Names beginning with `$0-` are flagged `scope_warning: dollar-zero-scoped`
+in the output. `$0` resolves to a per-instance canvas ID at runtime, which
+static analysis cannot follow — so cross-instance matches are surfaced but
+marked as potentially false positives.
+
+For project-wide bus auditing:
+
+```sh
+pdtk deps src/ --recursive --buses --json | jq '.unsatisfied'
+```
+
+reports buses that an abstraction expects but no caller provides (or
+vice versa).
+
+---
+
+## Lint checks
+
+`lint` always runs structural validation (same as `validate`) plus layout
+overlap detection. Three further heuristics are opt-in:
+
+| Flag | What it reports | Limitations |
+|---|---|---|
+| `--send-receive` | Orphan sends (`[s foo]` with no `[r foo]`), dead receives, broadcast receives (multiple `[r foo]` for one name) | Per-canvas scoping; respects bus namespaces |
+| `--fan-out` | Control-rate outlets feeding 2+ destinations without a `[trigger]` — message order is undefined | Heuristic: skips sources whose class ends in `~`. Mixed-rate objects (e.g. `snapshot~`) may be false negatives |
+| `--dsp-loop` | Static DSP feedback cycles in the signal graph | Per-canvas only — does **not** see through `inlet~`/`outlet~`, abstractions, `pd~`, or `clone` |
+
+All three are informational: they produce `STYLE:` lines but do not change
+the exit code. Only structural errors fail lint.
 
 ---
 
@@ -95,6 +166,9 @@ pdtk batch    src/ format --in-place           # auto-format all files
 - **`--in-place`** is never the default. Stdout is the default output for
   mutation commands.
 - **`--backup`** writes `<file>.bak` before overwriting.
+- **`modify`, `rename-send`, and `extract`** apply PD's file-level escaping
+  (`\$N`, `\;`, `\,`) to user input automatically — pass the unescaped form
+  and the on-disk file will match what PD itself would save.
 
 ---
 
@@ -126,17 +200,48 @@ pdtk modify patch.pd --depth 0 --index 3 --text 'route 1 2 3' --in-place
 If the new text would leave an existing outlet connection out of range, pdtk
 prints a warning but still writes (the connection may need removing separately).
 
-### Check a project before deploying to hardware
-
-Validate every patch and list any abstractions that can't be found on disk:
+### Run all lint heuristics at once
 
 ```sh
-pdtk batch src/ validate
-pdtk deps  src/main.pd --missing
+pdtk lint patch.pd --send-receive --fan-out --dsp-loop
 ```
 
-Both commands exit non-zero if problems are found, so they drop cleanly into a
-`Makefile` or CI step.
+Reports orphan/dead/broadcast buses, untrigger'd control fan-outs, and DSP
+feedback cycles alongside the standard structural and overlap checks.
+
+### Trace a bus across a patch
+
+```sh
+pdtk trace patch.pd --from 0 --show-bus-hops --to 42
+```
+
+Finds the shortest path from object 0 to object 42, following both wires
+and bus hops. With `--json`, every step carries `hop_kind` (`wire` or `bus`),
+`bus_kind`, `bus_name`, and any `scope_warning`.
+
+### Check a project before deploying to hardware
+
+Validate every patch, list missing abstractions, and report unsatisfied
+bus contracts:
+
+```sh
+pdtk batch src/ --continue-on-error validate
+pdtk deps  src/main.pd --missing
+pdtk deps  src/ --recursive --buses --json
+```
+
+All three exit non-zero on problems, so they drop cleanly into a `Makefile`
+or CI step.
+
+### Diff two patches ignoring auto-format changes
+
+```sh
+pdtk format old.pd --output formatted.pd
+pdtk diff   formatted.pd new.pd --ignore-coords
+```
+
+`--ignore-coords` suppresses coordinate-only changes — essential when
+comparing a `format`ted file against its source.
 
 ### Extract a subpatch into a reusable abstraction
 
@@ -155,9 +260,14 @@ pdtk extract sequencer.pd --depth 1 --output step_counter.pd --in-place
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Validation / lint errors |
+| 1 | Validation / lint structural errors |
 | 2 | Parse / usage errors |
 | 3 | I/O errors |
+
+`lint` returns 0 even when `STYLE:` warnings are present — only structural
+errors (the same ones `validate` catches) yield exit 1. `validate --strict`
+treats duplicate connections as warnings, not errors, so they also do not
+change the exit code.
 
 ---
 
@@ -168,6 +278,11 @@ pdtk extract sequencer.pd --depth 1 --output step_counter.pd --in-place
 ```sh
 cargo install pdtk
 ```
+
+### Prebuilt binary
+
+An x86_64 Linux binary, `pdtk-x86_64-linux`, is included in the repository
+root for users without a Rust toolchain. Copy it onto your `PATH` and run.
 
 ### Build from source
 
