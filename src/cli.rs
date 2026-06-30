@@ -6,6 +6,9 @@ use clap_complete::Shell;
 const AFTER_HELP: &str = "\
 COMMANDS BY CATEGORY
 
+  Creation:
+    new           Create a blank .pd patch file
+
   Inspection:
     parse         Parse a .pd file and print summary statistics
     list          List objects with indices and details
@@ -799,6 +802,66 @@ pub enum Commands {
         /// Create a .bak backup of the source before modifying
         #[arg(long, help = "Create a .bak backup before overwriting")]
         backup: bool,
+    },
+
+    // Creation
+    /// Create a blank .pd patch file
+    #[command(
+        long_about = "Create a blank Pure Data patch file containing only the canvas header.\n\
+                      The output is byte-compatible with patches created by 'File > New'\n\
+                      in Pure Data, using the same default canvas dimensions from the\n\
+                      PD source (g_canvas.h / g_canvas.c / s_main.c):\n\
+                      width 450 (GLIST_DEFCANVASWIDTH), height 300 (GLIST_DEFCANVASHEIGHT),\n\
+                      x 0 (GLIST_DEFCANVASXLOC), font 12 (DEFAULTFONT).\n\
+                      The Y default is platform-specific: 22 on macOS, 50 on Linux\n\
+                      (GLIST_DEFCANVASYLOC). Override with --canvas-y if needed.\n\n\
+                      If no output path is given, the patch text is written to stdout.",
+        after_long_help = "EXAMPLES:\n    pdtk new patch.pd\n    \
+                          pdtk new patch.pd --width 800 --height 600\n    \
+                          pdtk new --font 10 patch.pd\n    \
+                          pdtk new           # write to stdout"
+    )]
+    New {
+        /// Path for the new .pd file (omit to write to stdout)
+        output: Option<String>,
+        /// Canvas width in pixels
+        #[arg(
+            long,
+            default_value_t = crate::commands::new::CANVAS_WIDTH,
+            help = "Canvas width in pixels (default: 450)"
+        )]
+        width: u32,
+        /// Canvas height in pixels
+        #[arg(
+            long,
+            default_value_t = crate::commands::new::CANVAS_HEIGHT,
+            help = "Canvas height in pixels (default: 300)"
+        )]
+        height: u32,
+        /// Window X screen position in pixels
+        #[arg(
+            long = "canvas-x",
+            default_value_t = crate::commands::new::CANVAS_X,
+            help = "Window X screen position (default: 0)"
+        )]
+        x: u32,
+        /// Window Y screen position in pixels (PD uses 22 on macOS, 50 on Linux)
+        #[arg(
+            long = "canvas-y",
+            default_value_t = crate::commands::new::CANVAS_Y,
+            help = "Window Y screen position (PD default: 22 macOS / 50 Linux)"
+        )]
+        y: u32,
+        /// Font size in points
+        #[arg(
+            long,
+            default_value_t = crate::commands::new::CANVAS_FONT,
+            help = "Font size in points (default: 12)"
+        )]
+        font: u32,
+        /// Overwrite the output file if it already exists
+        #[arg(long, help = "Overwrite existing file")]
+        force: bool,
     },
 
     // Utilities

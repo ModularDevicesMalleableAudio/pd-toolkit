@@ -561,6 +561,61 @@ test_pdtk_integration() {
         fi
     fi
 
+    # new
+    local tmp_new
+    tmp_new=$(mktemp --suffix=.pd)
+    rm -f "$tmp_new"   # mktemp creates the file; new refuses to overwrite without --force
+    if "$pdtk" new "$tmp_new" 2>/dev/null; then
+        # Must be a single-line canvas header
+        local line_count
+        line_count=$(wc -l < "$tmp_new")
+        if [ "$line_count" -eq 1 ]; then
+            pass "pdtk new — creates single-line patch"
+        else
+            fail "pdtk new — expected 1 line, got $line_count"
+        fi
+        # Must start with #N canvas and be parseable
+        if grep -q '^#N canvas ' "$tmp_new"; then
+            pass "pdtk new — output begins with #N canvas"
+        else
+            fail "pdtk new — output does not begin with #N canvas"
+        fi
+        if "$pdtk" parse "$tmp_new" >/dev/null 2>&1; then
+            pass "pdtk new — output is parseable"
+        else
+            fail "pdtk new — output failed pdtk parse"
+        fi
+        if "$pdtk" validate "$tmp_new" >/dev/null 2>&1; then
+            pass "pdtk new — output is valid"
+        else
+            fail "pdtk new — output failed pdtk validate"
+        fi
+        # --force must allow overwrite
+        if "$pdtk" new --force "$tmp_new" >/dev/null 2>&1; then
+            pass "pdtk new --force overwrites existing file"
+        else
+            fail "pdtk new --force — failed to overwrite"
+        fi
+    else
+        fail "pdtk new $tmp_new — exited non-zero"
+    fi
+    # Refuse to overwrite without --force
+    if ! "$pdtk" new "$tmp_new" >/dev/null 2>&1; then
+        pass "pdtk new refuses to overwrite without --force"
+    else
+        fail "pdtk new — should refuse to overwrite without --force"
+    fi
+    rm -f "$tmp_new"
+
+    # stdout mode
+    local stdout_out
+    stdout_out=$("$pdtk" new 2>/dev/null)
+    if echo "$stdout_out" | grep -q '^#N canvas '; then
+        pass "pdtk new (stdout) — begins with #N canvas"
+    else
+        fail "pdtk new (stdout) — unexpected output: $stdout_out"
+    fi
+
     # Add further command blocks here as implementation steps complete.
 }
 

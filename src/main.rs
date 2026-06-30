@@ -576,6 +576,26 @@ fn main() {
                 }
             }
         }
+        Some(Commands::New {
+            output,
+            width,
+            height,
+            x,
+            y,
+            font,
+            force,
+        }) => match commands::new::run(output.as_deref(), width, height, x, y, font, force) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    print!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
         Some(Commands::Completions { shell }) => {
             use clap::CommandFactory;
             use clap_complete::generate;
