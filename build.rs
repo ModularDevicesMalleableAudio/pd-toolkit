@@ -439,6 +439,53 @@ fn build_root_command() -> clap::Command {
                 .arg(Arg::new("backup").long("backup").num_args(0)),
         )
         .subcommand(
+            Command::new("new")
+                .about("Create a blank .pd patch file")
+                .long_about(
+                    "Create a blank Pure Data patch file containing only the canvas header.\n\
+                     The output is byte-compatible with patches created by 'File > New'\n\
+                     in Pure Data, using default canvas dimensions from the PD source:\n\
+                     width 450 (GLIST_DEFCANVASWIDTH), height 300 (GLIST_DEFCANVASHEIGHT),\n\
+                     x 0 (GLIST_DEFCANVASXLOC), font 12 (DEFAULTFONT).\n\
+                     Y default is platform-specific: 22 on macOS, 50 on Linux\n\
+                     (GLIST_DEFCANVASYLOC). Override with --canvas-y if needed.\n\n\
+                     If no output path is given, the patch text is written to stdout.",
+                )
+                .arg(Arg::new("output").value_name("OUTPUT"))
+                .arg(
+                    Arg::new("width")
+                        .long("width")
+                        .value_name("W")
+                        .default_value("450"),
+                )
+                .arg(
+                    Arg::new("height")
+                        .long("height")
+                        .value_name("H")
+                        .default_value("300"),
+                )
+                .arg(
+                    Arg::new("canvas-x")
+                        .long("canvas-x")
+                        .value_name("X")
+                        .default_value("0"),
+                )
+                .arg(
+                    Arg::new("canvas-y")
+                        .long("canvas-y")
+                        .value_name("Y")
+                        .help("Window Y screen position (PD default: 22 macOS / 50 Linux)")
+                        .default_value("22"),
+                )
+                .arg(
+                    Arg::new("font")
+                        .long("font")
+                        .value_name("F")
+                        .default_value("12"),
+                )
+                .arg(Arg::new("force").long("force").num_args(0)),
+        )
+        .subcommand(
             Command::new("batch")
                 .about("Apply a pdtk command recursively across .pd files in a directory")
                 .arg(Arg::new("dir").required(true))

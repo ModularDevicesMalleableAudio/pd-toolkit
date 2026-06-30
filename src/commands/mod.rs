@@ -15,6 +15,7 @@ pub mod insert;
 pub mod lint;
 pub mod list;
 pub mod modify;
+pub mod new;
 pub mod parse;
 pub mod rename_send;
 pub mod renumber;

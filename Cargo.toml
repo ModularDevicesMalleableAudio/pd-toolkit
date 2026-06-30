@@ -1,6 +1,6 @@
 [package]
 name = "pdtk"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.87"
 description = "Safe structural editing, validation, & analysis for Pure Data .pd patch files 🦀"
