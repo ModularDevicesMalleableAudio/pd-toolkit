@@ -348,6 +348,33 @@ fn parse_graph_and_pd_subpatches_coexist() {
 }
 
 #[test]
+fn array_is_indexed_object() {
+    // `#X array` is a gobj in Pd and consumes a connect index. In
+    // array_in_canvas.pd: array=0, metro=1, tabwrite=2.
+    let patch = parse_fixture("array_in_canvas.pd");
+    assert_eq!(patch.object_count_at_depth(0), 3);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "array");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "metro");
+    assert_eq!(patch.object_at(0, 2).unwrap().class(), "tabwrite");
+
+    // The connection metro(1) -> tabwrite(2) is in range only when the
+    // array is counted.
+    let conns = patch.connections_at_depth(0);
+    assert!(conns.iter().any(|c| c.src == 1 && c.dst == 2));
+}
+
+#[test]
+fn scalar_is_indexed_object_with_scalar_class() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X scalar tmpl 1 2 3;\n\
+                 #X obj 50 50 print;\n";
+    let patch = parse(input).unwrap();
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "scalar");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "print");
+}
+
+#[test]
 fn parse_entry_x_y_coordinates() {
     let patch = parse_fixture("simple_chain.pd");
     let lb = patch.object_at(0, 0).unwrap();

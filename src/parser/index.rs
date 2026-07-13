@@ -63,7 +63,11 @@ pub fn assign_depth_and_indices(entries: &mut [Entry]) {
             | EntryKind::Text
             | EntryKind::FloatAtom
             | EntryKind::SymbolAtom
-            | EntryKind::ListAtom => {
+            | EntryKind::ListAtom
+            // `#X array` and `#X scalar` are gobjs in Pd (glist_add), so they
+            // occupy a connect index in their canvas.
+            | EntryKind::Array
+            | EntryKind::Scalar => {
                 entry.depth = depth;
                 entry.canvas_id = canvas_id_stack.last().copied();
                 if let Some(counter) = canvas_counters.last_mut() {
@@ -242,6 +246,48 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(depth2_inlets, vec![Some(0), Some(0)]);
+    }
+
+    #[test]
+    fn index_array_is_indexed_object() {
+        // `#X array` is a gobj in Pd (graph_array -> graph_scalar -> glist_add),
+        // so it consumes a connect index. array=0, metro=1, tabwrite=2.
+        let input = "#N canvas 0 0 100 100 10;\n#X array foo 100 float 3;\n#X obj 10 10 metro 100;\n#X obj 10 20 tabwrite foo;\n#X connect 1 0 2 0;";
+        let entries = parse_entries(input);
+
+        assert_eq!(object_indices_at_depth(&entries, 1), vec![0, 1, 2]);
+        let arr = entries
+            .iter()
+            .find(|e| e.raw.starts_with("#X array"))
+            .expect("missing array entry");
+        assert_eq!(arr.object_index, Some(0));
+    }
+
+    #[test]
+    fn index_scalar_is_indexed_object() {
+        // `#X scalar` is a gobj in Pd (glist_scalar -> glist_add).
+        let input = "#N canvas 0 0 100 100 10;\n#X scalar tmpl 1 2 3;\n#X obj 10 10 print;";
+        let entries = parse_entries(input);
+
+        assert_eq!(object_indices_at_depth(&entries, 1), vec![0, 1]);
+        let sc = entries
+            .iter()
+            .find(|e| e.raw.starts_with("#X scalar"))
+            .expect("missing scalar entry");
+        assert_eq!(sc.object_index, Some(0));
+    }
+
+    #[test]
+    fn index_array_in_graph_subcanvas_is_indexed() {
+        // The array inside a graph subcanvas gets index 0 at its own depth.
+        let input = include_str!("../../tests/fixtures/handcrafted/with_graph.pd");
+        let entries = parse_entries(input);
+        let arr = entries
+            .iter()
+            .find(|e| e.raw.starts_with("#X array"))
+            .expect("missing array entry");
+        assert_eq!(arr.depth, 2);
+        assert_eq!(arr.object_index, Some(0));
     }
 
     #[test]

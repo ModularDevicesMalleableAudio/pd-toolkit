@@ -9,6 +9,7 @@ use pdtk::rewrite::serialize;
 pub fn run(
     file: &str,
     user_depth: usize,
+    index: usize,
     output_path: &str,
     in_place: bool,
     backup: bool,
@@ -22,12 +23,16 @@ pub fn run(
     // CanvasOpen at internal depth 1.)
     let sub_canvas_internal_depth = user_depth;
 
-    // Skip the root canvas (position 0) when searching.
-    let canvas_pos = entries[1..]
+    // The Nth `#N canvas` at this depth (document order) selects the subpatch.
+    let canvas_pos = entries
         .iter()
-        .position(|e| e.kind == EntryKind::CanvasOpen && e.depth == sub_canvas_internal_depth)
-        .map(|p| p + 1) // adjust back to full-slice index
-        .ok_or_else(|| PdtkError::Usage(format!("no subpatch found at depth {user_depth}")))?;
+        .enumerate()
+        .filter(|(_, e)| e.kind == EntryKind::CanvasOpen && e.depth == sub_canvas_internal_depth)
+        .map(|(i, _)| i)
+        .nth(index)
+        .ok_or_else(|| {
+            PdtkError::Usage(format!("no subpatch at depth {user_depth} index {index}"))
+        })?;
 
     // The matching Restore closes this subpatch.
     let restore_pos = entries[canvas_pos + 1..]
@@ -48,9 +53,13 @@ pub fn run(
     // Boundary connection analysis: which parent connections reference the
     // restore box?  These tell us how many inlets/outlets to add.
     // -----------------------------------------------------------------------
+    // Boundary connections live in the restore box's own (parent) canvas.
+    // Filtering by depth alone would also pick up connections from sibling
+    // canvases at the same depth, inflating the inferred inlet/outlet counts.
+    let parent_canvas_id = entries[restore_pos].canvas_id;
     let parent_conns: Vec<Connection> = entries
         .iter()
-        .filter(|e| e.kind == EntryKind::Connect && e.depth == sub_canvas_internal_depth)
+        .filter(|e| e.kind == EntryKind::Connect && e.canvas_id == parent_canvas_id)
         .filter_map(|e| Connection::parse(&e.raw))
         .collect();
 

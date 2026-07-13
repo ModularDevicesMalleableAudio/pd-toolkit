@@ -5,6 +5,8 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 struct ListObject {
     depth: usize,
+    /// `--canvas N` ordinal among sibling subpatches at this depth.
+    canvas: Option<usize>,
     index: usize,
     class: String,
     args: Vec<String>,
@@ -34,8 +36,12 @@ pub fn run(
                 return None;
             }
 
+            let canvas = e
+                .canvas_id
+                .and_then(|cid| patch.canvas_ordinal(user_depth, cid));
             Some(ListObject {
                 depth: user_depth,
+                canvas,
                 index: idx,
                 class: e.class().to_owned(),
                 args: e.args(),
@@ -46,7 +52,7 @@ pub fn run(
         })
         .collect();
 
-    rows.sort_by_key(|r| (r.depth, r.index));
+    rows.sort_by_key(|r| (r.depth, r.canvas, r.index));
 
     let text = if json {
         serde_json::to_string_pretty(&rows)?

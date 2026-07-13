@@ -213,6 +213,13 @@ pub enum Commands {
         /// Subpatch depth (0 = top-level)
         #[arg(long, default_value = "0", help = "Subpatch depth (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
         /// Output results as JSON
         #[arg(long, help = "Output results as JSON")]
         json: bool,
@@ -483,6 +490,13 @@ pub enum Commands {
         /// Depth to insert at (0 = top-level)
         #[arg(long, help = "Depth to insert at (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
         /// Index to insert before (0-based)
         #[arg(long, help = "Insert before this index (0-based)")]
         index: usize,
@@ -514,6 +528,13 @@ pub enum Commands {
         /// Depth of the object to delete (0 = top-level)
         #[arg(long, help = "Depth of the object (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (object delete only; 0 = first)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0; ignored with --subpatch)"
+        )]
+        canvas: usize,
         /// Index of the object to delete (0-based)
         #[arg(
             long,
@@ -553,6 +574,13 @@ pub enum Commands {
         /// Depth of the object (0 = top-level)
         #[arg(long, help = "Depth of the object (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
         /// Index of the object to modify (0-based)
         #[arg(long, help = "Object index to modify (0-based)")]
         index: usize,
@@ -585,6 +613,13 @@ pub enum Commands {
         /// Depth of the connection (0 = top-level)
         #[arg(long, help = "Depth (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
         /// Source object index
         #[arg(long, help = "Source object index (0-based)")]
         src: usize,
@@ -621,6 +656,13 @@ pub enum Commands {
         /// Depth of the connection (0 = top-level)
         #[arg(long, help = "Depth (0 = top-level)")]
         depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
         /// Source object index
         #[arg(long, help = "Source object index (0-based)")]
         src: usize,
@@ -768,6 +810,60 @@ pub enum Commands {
     },
 
     // Subpatch Operations
+    /// Create a new subpatch inside an existing patch
+    #[command(
+        long_about = "Insert a new `#N canvas … #X restore … pd NAME;` subpatch block at\n\
+                      --depth D --index I (like insert), renumbering the parent canvas's\n\
+                      connections. The subpatch uses the 6-argument subwindow header\n\
+                      (`#N canvas X Y W H NAME 0;`). --inlets/--outlets add inlet/outlet\n\
+                      objects inside the new subpatch. The result is validated before writing.",
+        after_long_help = "EXAMPLES:\n    pdtk subpatch patch.pd --depth 0 --index 2 --name voice --inlets 1 --outlets 1 --in-place\n    \
+                           pdtk subpatch patch.pd --depth 1 --index 0 --name helper --in-place"
+    )]
+    Subpatch {
+        /// Path to the .pd file
+        file: String,
+        /// Parent depth to create the subpatch in (0 = top-level)
+        #[arg(long, help = "Parent depth (0 = top-level)")]
+        depth: usize,
+        /// Which sibling canvas at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth sibling subpatch at this depth (default 0)"
+        )]
+        canvas: usize,
+        /// Object index the new subpatch takes in the parent
+        #[arg(long, help = "Object index for the new subpatch (0-based)")]
+        index: usize,
+        /// Subpatch name (appears as `pd NAME`)
+        #[arg(long, help = "Subpatch name")]
+        name: String,
+        /// Number of inlet objects to add inside the subpatch
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Inlet objects to create (default 0)"
+        )]
+        inlets: usize,
+        /// Number of outlet objects to add inside the subpatch
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Outlet objects to create (default 0)"
+        )]
+        outlets: usize,
+        /// Overwrite the original file
+        #[arg(long, help = "Write changes back to the original file")]
+        in_place: bool,
+        /// Create a .bak backup before modifying
+        #[arg(long, help = "Create a .bak backup before overwriting")]
+        backup: bool,
+        /// Write output to this file instead of stdout
+        #[arg(long, value_name = "PATH", help = "Write output to file")]
+        output: Option<String>,
+    },
+
     /// Extract a subpatch into a standalone abstraction file
     #[command(
         long_about = "Find the subpatch at --depth N (the first nested canvas at that\n\
@@ -786,6 +882,13 @@ pub enum Commands {
         /// Subpatch depth to extract (1 = first nested canvas)
         #[arg(long, help = "Depth of the subpatch to extract (1 = first nested)")]
         depth: usize,
+        /// Which subpatch at this depth (0 = first, default)
+        #[arg(
+            long,
+            default_value = "0",
+            help = "Nth subpatch at this depth (default 0)"
+        )]
+        index: usize,
         /// Path to write the extracted abstraction
         #[arg(
             long,

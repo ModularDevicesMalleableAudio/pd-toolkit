@@ -359,13 +359,49 @@ fn declare_paths(file: &Path, content: &str) -> Vec<PathBuf> {
     paths
 }
 
-/// Search for `name.pd` in a list of directories.
+/// File extensions Pd resolves for an object class, in resolution order:
+/// compiled externals (platform-specific), Lua externals (pdlua loader), then
+/// abstractions (`.pd`, `.pat`).  Mirrors `sys_loadlib_iter` (loaders first,
+/// then `sys_do_load_abs`).
+fn class_extensions() -> Vec<&'static str> {
+    let mut exts: Vec<&'static str> = Vec::new();
+    if cfg!(target_os = "linux") {
+        exts.extend(["pd_linux", "l_amd64", "l_ia64", "so"]);
+    } else if cfg!(target_os = "macos") {
+        exts.extend(["pd_darwin", "d_amd64", "d_arm64", "d_fat", "so"]);
+    } else if cfg!(target_os = "windows") {
+        exts.extend(["dll", "m_amd64"]);
+    }
+    // Loader-based (pdlua) and abstraction extensions are platform-independent.
+    exts.extend(["pd_lua", "pd_luax", "pd", "pat"]);
+    exts
+}
+
+/// True if `path` is a Pd patch (abstraction) we can meaningfully recurse into.
+fn is_patch_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("pd" | "pat")
+    )
+}
+
+/// Search for an object class's implementation file across `search_dirs`.
+///
+/// For each directory, tries `name.<ext>` and the `name/name.<ext>`
+/// class-in-folder convention for every known extension (abstractions, Lua
+/// externals, and platform compiled externals).
 fn locate_abstraction(name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
-    let filename = format!("{name}.pd");
+    let exts = class_extensions();
     for dir in search_dirs {
-        let candidate = dir.join(&filename);
-        if candidate.exists() {
-            return Some(candidate);
+        for ext in &exts {
+            let direct = dir.join(format!("{name}.{ext}"));
+            if direct.exists() {
+                return Some(direct);
+            }
+            let in_folder = dir.join(name).join(format!("{name}.{ext}"));
+            if in_folder.exists() {
+                return Some(in_folder);
+            }
         }
     }
     None
@@ -471,9 +507,13 @@ fn analyse_file_with_ancestors(
             source,
         });
 
-        // Recursive: follow found abstractions, propagating our full search
-        // chain so the child can resolve refs via our declares too.
-        if recursive && let Some(ref abs_path) = location {
+        // Recursive: follow found abstractions (patch files only; compiled and
+        // Lua externals are not Pd patches), propagating our full search chain
+        // so the child can resolve refs via our declares too.
+        if recursive
+            && let Some(ref abs_path) = location
+            && is_patch_file(abs_path)
+        {
             let sub_results =
                 analyse_file_with_ancestors(abs_path, recursive, visited, &search_dirs, extra_dirs);
             results.extend(sub_results);

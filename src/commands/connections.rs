@@ -26,18 +26,30 @@ struct OutletEntry {
     dst_text: String,
 }
 
-pub fn run(file: &str, index: usize, depth: usize, json: bool) -> Result<String, PdtkError> {
+pub fn run(
+    file: &str,
+    index: usize,
+    depth: usize,
+    canvas: usize,
+    json: bool,
+) -> Result<String, PdtkError> {
     let input = io::read_patch_file(file)?;
     let patch = parse(&input)?;
 
-    let conns = patch.connections_at_depth(depth);
+    let canvas_id = patch.resolve_canvas(depth, canvas).ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "no canvas {canvas} at depth {depth} ({} at this depth)",
+            patch.canvas_ids_at_depth(depth).len()
+        ))
+    })?;
+    let conns = patch.connections_in_canvas(canvas_id);
 
     let inlets: Vec<InletEntry> = conns
         .iter()
         .filter(|c| c.dst == index)
         .map(|c| {
             let src_text = patch
-                .object_at(depth, c.src)
+                .object_in_canvas(canvas_id, c.src)
                 .map(|e| e.raw.clone())
                 .unwrap_or_default();
             InletEntry {
@@ -53,7 +65,7 @@ pub fn run(file: &str, index: usize, depth: usize, json: bool) -> Result<String,
         .filter(|c| c.src == index)
         .map(|c| {
             let dst_text = patch
-                .object_at(depth, c.dst)
+                .object_in_canvas(canvas_id, c.dst)
                 .map(|e| e.raw.clone())
                 .unwrap_or_default();
             OutletEntry {

@@ -11,6 +11,8 @@ pub struct RunArgs<'a> {
     pub file: &'a str,
     /// User-visible depth (0 = top-level).
     pub depth: usize,
+    /// Nth sibling canvas at this depth (0 = first).
+    pub canvas: usize,
     /// Source object index.
     pub src: usize,
     /// Source outlet index.
@@ -31,6 +33,7 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
     let RunArgs {
         file,
         depth,
+        canvas,
         src,
         outlet,
         dst,
@@ -44,7 +47,13 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
     let mut patch = parse(&input)?;
 
     let internal_depth = depth + 1;
-    let obj_count = patch.object_count_at_depth(depth);
+    let canvas_id = patch.resolve_canvas(depth, canvas).ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "no canvas {canvas} at depth {depth} ({} at this depth)",
+            patch.canvas_ids_at_depth(depth).len()
+        ))
+    })?;
+    let obj_count = patch.object_count_in_canvas(canvas_id);
 
     if src >= obj_count {
         return Err(PdtkError::Usage(format!(
@@ -59,7 +68,7 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
 
     // Refuse duplicate connections
     let already_exists = patch
-        .connections_at_depth(depth)
+        .connections_in_canvas(canvas_id)
         .iter()
         .any(|c| c.src == src && c.src_outlet == outlet && c.dst == dst && c.dst_inlet == inlet);
     if already_exists {
@@ -68,18 +77,18 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
         )));
     }
 
-    // Find insertion point: after the last Connect at this depth, or after the
-    // last object at this depth if there are no connections yet.
+    // Find insertion point: after the last Connect in this canvas, or after the
+    // last object in this canvas if there are no connections yet.
     let insert_pos = patch
         .entries
         .iter()
-        .rposition(|e| e.kind == EntryKind::Connect && e.depth == internal_depth)
+        .rposition(|e| e.kind == EntryKind::Connect && e.canvas_id == Some(canvas_id))
         .map(|p| p + 1)
         .or_else(|| {
             patch
                 .entries
                 .iter()
-                .rposition(|e| e.depth == internal_depth && e.object_index.is_some())
+                .rposition(|e| e.canvas_id == Some(canvas_id) && e.object_index.is_some())
                 .map(|p| p + 1)
         })
         .unwrap_or(patch.entries.len());
@@ -89,7 +98,7 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
         kind: EntryKind::Connect,
         depth: internal_depth,
         object_index: None,
-        canvas_id: None,
+        canvas_id: Some(canvas_id),
     };
     patch.entries.insert(insert_pos, new_conn);
 

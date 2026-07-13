@@ -1,6 +1,5 @@
 {
   "_comment": "Expected parse results for test fixtures. Used by both shell and Rust tests.",
-
   "handcrafted/minimal.pd": {
     "entry_count": 1,
     "depth_0_objects": 0,
@@ -8,7 +7,6 @@
     "max_depth": 0,
     "canvas_count": 1
   },
-
   "handcrafted/simple_chain.pd": {
     "entry_count": 6,
     "depth_0_objects": 3,
@@ -16,35 +14,50 @@
     "max_depth": 0,
     "canvas_count": 1,
     "objects_at_0": [
-      {"index": 0, "class": "loadbang"},
-      {"index": 1, "class": "t"},
-      {"index": 2, "class": "print"}
+      {
+        "index": 0,
+        "class": "loadbang"
+      },
+      {
+        "index": 1,
+        "class": "t"
+      },
+      {
+        "index": 2,
+        "class": "print"
+      }
     ],
     "connections_at_0": [
-      {"src": 0, "outlet": 0, "dst": 1, "inlet": 0},
-      {"src": 1, "outlet": 0, "dst": 2, "inlet": 0}
+      {
+        "src": 0,
+        "outlet": 0,
+        "dst": 1,
+        "inlet": 0
+      },
+      {
+        "src": 1,
+        "outlet": 0,
+        "dst": 2,
+        "inlet": 0
+      }
     ]
   },
-
   "handcrafted/branching.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 4,
     "max_depth": 0
   },
-
   "handcrafted/merging.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 4,
     "max_depth": 0
   },
-
   "handcrafted/cycle.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 5,
     "max_depth": 0,
-    "_note": "Has feedback: connect 2 0 0 1 (mod→f)"
+    "_note": "Has feedback: connect 2 0 0 1 (mod\u2192f)"
   },
-
   "handcrafted/nested_subpatch.pd": {
     "depth_0_objects": 3,
     "depth_0_connections": 2,
@@ -53,17 +66,36 @@
     "max_depth": 1,
     "canvas_count": 2,
     "objects_at_0": [
-      {"index": 0, "class": "inlet"},
-      {"index": 1, "class": "restore", "restore_type": "pd", "restore_name": "my_sub"},
-      {"index": 2, "class": "outlet"}
+      {
+        "index": 0,
+        "class": "inlet"
+      },
+      {
+        "index": 1,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "my_sub"
+      },
+      {
+        "index": 2,
+        "class": "outlet"
+      }
     ],
     "objects_at_1": [
-      {"index": 0, "class": "inlet"},
-      {"index": 1, "class": "+"},
-      {"index": 2, "class": "outlet"}
+      {
+        "index": 0,
+        "class": "inlet"
+      },
+      {
+        "index": 1,
+        "class": "+"
+      },
+      {
+        "index": 2,
+        "class": "outlet"
+      }
     ]
   },
-
   "handcrafted/deep_subpatch.pd": {
     "depth_0_objects": 3,
     "depth_1_objects": 3,
@@ -72,48 +104,86 @@
     "max_depth": 3,
     "canvas_count": 4
   },
-
   "handcrafted/multiple_subpatches.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 4,
     "max_depth": 1,
     "canvas_count": 3,
     "objects_at_0": [
-      {"index": 0, "class": "loadbang"},
-      {"index": 1, "class": "restore", "restore_type": "pd", "restore_name": "sub_a"},
-      {"index": 2, "class": "restore", "restore_type": "pd", "restore_name": "sub_b"},
-      {"index": 3, "class": "print"},
-      {"index": 4, "class": "print"}
+      {
+        "index": 0,
+        "class": "loadbang"
+      },
+      {
+        "index": 1,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "sub_a"
+      },
+      {
+        "index": 2,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "sub_b"
+      },
+      {
+        "index": 3,
+        "class": "print"
+      },
+      {
+        "index": 4,
+        "class": "print"
+      }
     ]
   },
-
+  "handcrafted/sibling_subpatches.pd": {
+    "depth_0_objects": 3,
+    "depth_0_connections": 2,
+    "max_depth": 1,
+    "canvas_count": 3,
+    "objects_at_0": [
+      {
+        "index": 0,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "sub_a"
+      },
+      {
+        "index": 1,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "sub_b"
+      },
+      {
+        "index": 2,
+        "class": "dac~"
+      }
+    ],
+    "_note": "Two sibling pd subpatches. sub_a=canvas 0, sub_b=canvas 1 at depth 1; each has inlet/osc~ or phasor~/outlet~ at local indices 0,1,2. Exercises --canvas disambiguation."
+  },
   "handcrafted/multiline_obj.pd": {
     "depth_0_objects": 3,
     "depth_0_connections": 2,
     "max_depth": 0,
     "_note": "First entry is a multi-line msg spanning 3 lines. Must parse as 1 entry."
   },
-
   "handcrafted/escaped_chars.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 3,
     "max_depth": 0,
     "_note": "Objects contain \\$, \\, and \\; escapes"
   },
-
   "handcrafted/escaped_semicolons.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 3,
     "max_depth": 0,
     "_note": "Messages contain \\; which must NOT terminate the entry. Each msg spans 2 lines."
   },
-
   "handcrafted/dollar_signs.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 2,
     "max_depth": 0
   },
-
   "handcrafted/with_declare.pd": {
     "depth_0_objects": 10,
     "depth_0_connections": 6,
@@ -121,7 +191,6 @@
     "has_standalone_declare": true,
     "_note": "Standalone #X declare at entry 1 is NOT an object. Index 0 = inlet, index 9 = t f b."
   },
-
   "handcrafted/with_width_hint.pd": {
     "depth_0_objects": 2,
     "depth_0_connections": 1,
@@ -131,147 +200,329 @@
     "has_width_hint": true,
     "_note": "#X f 38 after restore is NOT an object. Depth 0: index 0 = restore, index 1 = print."
   },
-
   "handcrafted/with_graph.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 2,
     "max_depth": 1,
     "canvas_count": 2,
     "objects_at_0": [
-      {"index": 0, "class": "loadbang"},
-      {"index": 1, "class": "restore", "restore_type": "graph"},
-      {"index": 2, "class": "tabread"},
-      {"index": 3, "class": "print"}
+      {
+        "index": 0,
+        "class": "loadbang"
+      },
+      {
+        "index": 1,
+        "class": "restore",
+        "restore_type": "graph"
+      },
+      {
+        "index": 2,
+        "class": "tabread"
+      },
+      {
+        "index": 3,
+        "class": "print"
+      }
     ],
     "connections_at_0": [
-      {"src": 0, "outlet": 0, "dst": 2, "inlet": 0},
-      {"src": 2, "outlet": 0, "dst": 3, "inlet": 0}
+      {
+        "src": 0,
+        "outlet": 0,
+        "dst": 2,
+        "inlet": 0
+      },
+      {
+        "src": 2,
+        "outlet": 0,
+        "dst": 3,
+        "inlet": 0
+      }
     ],
     "_note": "Graph subpatch restore is index 1 but no connections reference it."
   },
-
   "handcrafted/graph_and_pd_subpatches.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 2,
     "max_depth": 1,
     "canvas_count": 3,
     "objects_at_0": [
-      {"index": 0, "class": "loadbang"},
-      {"index": 1, "class": "restore", "restore_type": "graph"},
-      {"index": 2, "class": "restore", "restore_type": "pd", "restore_name": "processor"},
-      {"index": 3, "class": "print"}
+      {
+        "index": 0,
+        "class": "loadbang"
+      },
+      {
+        "index": 1,
+        "class": "restore",
+        "restore_type": "graph"
+      },
+      {
+        "index": 2,
+        "class": "restore",
+        "restore_type": "pd",
+        "restore_name": "processor"
+      },
+      {
+        "index": 3,
+        "class": "print"
+      }
     ],
     "connections_at_0": [
-      {"src": 0, "outlet": 0, "dst": 2, "inlet": 0},
-      {"src": 2, "outlet": 0, "dst": 3, "inlet": 0}
+      {
+        "src": 0,
+        "outlet": 0,
+        "dst": 2,
+        "inlet": 0
+      },
+      {
+        "src": 2,
+        "outlet": 0,
+        "dst": 3,
+        "inlet": 0
+      }
     ]
   },
-
   "handcrafted/float_vs_width.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 5,
     "max_depth": 0,
     "objects_at_0": [
-      {"index": 0, "class": "f", "_note": "float object, class is 'f'"},
-      {"index": 1, "class": "f", "_note": "float object with arg, class is 'f'"},
-      {"index": 2, "class": "t", "_note": "trigger, ', f 8' is width hint not part of class"},
-      {"index": 3, "class": "+", "_note": "'+ 1, f 6' — width hint stripped for class"},
-      {"index": 4, "class": "print"}
+      {
+        "index": 0,
+        "class": "f",
+        "_note": "float object, class is 'f'"
+      },
+      {
+        "index": 1,
+        "class": "f",
+        "_note": "float object with arg, class is 'f'"
+      },
+      {
+        "index": 2,
+        "class": "t",
+        "_note": "trigger, ', f 8' is width hint not part of class"
+      },
+      {
+        "index": 3,
+        "class": "+",
+        "_note": "'+ 1, f 6' \u2014 width hint stripped for class"
+      },
+      {
+        "index": 4,
+        "class": "print"
+      }
     ]
   },
-
   "handcrafted/all_gui_types.pd": {
     "depth_0_objects": 12,
     "depth_0_connections": 9,
     "max_depth": 0,
     "gui_send_receive": [
-      {"index": 0, "type": "tgl", "send": "tgl_send", "receive": "tgl_recv"},
-      {"index": 1, "type": "bng", "send": "bng_send", "receive": "bng_recv"},
-      {"index": 2, "type": "floatatom", "receive": "float_recv"},
-      {"index": 3, "type": "symbolatom", "receive": "sym_recv"},
-      {"index": 4, "type": "nbx", "send": "nbx_send", "receive": "nbx_recv"},
-      {"index": 5, "type": "vsl", "send": "vsl_send", "receive": "vsl_recv"},
-      {"index": 6, "type": "hsl", "send": "hsl_send", "receive": "hsl_recv"},
-      {"index": 7, "type": "vradio", "send": "vrad_send", "receive": "vrad_recv"},
-      {"index": 8, "type": "hradio", "send": "hrad_send", "receive": "hrad_recv"},
-      {"index": 9, "type": "vu", "receive": "vu_recv"},
-      {"index": 10, "type": "cnv", "send": "cnv_send", "receive": "cnv_recv"}
+      {
+        "index": 0,
+        "type": "tgl",
+        "send": "tgl_send",
+        "receive": "tgl_recv"
+      },
+      {
+        "index": 1,
+        "type": "bng",
+        "send": "bng_send",
+        "receive": "bng_recv"
+      },
+      {
+        "index": 2,
+        "type": "floatatom",
+        "receive": "float_recv"
+      },
+      {
+        "index": 3,
+        "type": "symbolatom",
+        "receive": "sym_recv"
+      },
+      {
+        "index": 4,
+        "type": "nbx",
+        "send": "nbx_send",
+        "receive": "nbx_recv"
+      },
+      {
+        "index": 5,
+        "type": "vsl",
+        "send": "vsl_send",
+        "receive": "vsl_recv"
+      },
+      {
+        "index": 6,
+        "type": "hsl",
+        "send": "hsl_send",
+        "receive": "hsl_recv"
+      },
+      {
+        "index": 7,
+        "type": "vradio",
+        "send": "vrad_send",
+        "receive": "vrad_recv"
+      },
+      {
+        "index": 8,
+        "type": "hradio",
+        "send": "hrad_send",
+        "receive": "hrad_recv"
+      },
+      {
+        "index": 9,
+        "type": "vu",
+        "receive": "vu_recv"
+      },
+      {
+        "index": 10,
+        "type": "cnv",
+        "send": "cnv_send",
+        "receive": "cnv_recv"
+      }
     ]
   },
-
   "handcrafted/trace_send_receive_hop.pd": {
     "depth_0_objects": 12,
     "depth_0_connections": 6,
     "max_depth": 0,
-    "send_names": ["foo", "audio", "\\$0-instance"],
-    "receive_names": ["foo", "audio", "\\$0-instance"]
+    "send_names": [
+      "foo",
+      "audio",
+      "\\$0-instance"
+    ],
+    "receive_names": [
+      "foo",
+      "audio",
+      "\\$0-instance"
+    ]
   },
-
   "handcrafted/deps_builtin_aliases.pd": {
     "depth_0_objects": 13,
     "depth_0_connections": 0,
     "max_depth": 0
   },
-
   "handcrafted/listbox_send_receive.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 3,
     "max_depth": 0,
     "gui_send_receive": [
-      {"index": 2, "type": "listbox", "receive": "list_recv"},
-      {"index": 3, "type": "listbox", "send": "list_send"}
+      {
+        "index": 2,
+        "type": "listbox",
+        "receive": "list_recv"
+      },
+      {
+        "index": 3,
+        "type": "listbox",
+        "send": "list_send"
+      }
     ]
   },
-
   "handcrafted/radio_compat_hdl_vdl.pd": {
     "depth_0_objects": 4,
     "depth_0_connections": 2,
     "max_depth": 0,
     "gui_send_receive": [
-      {"index": 0, "type": "hdl", "send": "hdl_send", "receive": "hdl_recv"},
-      {"index": 1, "type": "vdl", "send": "vdl_send", "receive": "vdl_recv"}
+      {
+        "index": 0,
+        "type": "hdl",
+        "send": "hdl_send",
+        "receive": "hdl_recv"
+      },
+      {
+        "index": 1,
+        "type": "vdl",
+        "send": "vdl_send",
+        "receive": "vdl_recv"
+      }
     ]
   },
-
   "handcrafted/send_receive.pd": {
     "depth_0_objects": 9,
     "depth_0_connections": 5,
     "max_depth": 0,
-    "send_names": ["clock_main", "audio_bus", "reverb_bus"],
-    "receive_names": ["clock_main", "audio_bus", "reverb_bus"]
+    "send_names": [
+      "clock_main",
+      "audio_bus",
+      "reverb_bus"
+    ],
+    "receive_names": [
+      "clock_main",
+      "audio_bus",
+      "reverb_bus"
+    ]
   },
-
   "handcrafted/arrays.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 2,
     "max_depth": 1,
-    "array_names": ["waveform_a", "waveform_b"],
-    "array_sizes": [256, 128]
+    "array_names": [
+      "waveform_a",
+      "waveform_b"
+    ],
+    "array_sizes": [
+      256,
+      128
+    ]
   },
-
+  "handcrafted/array_in_canvas.pd": {
+    "depth_0_objects": 3,
+    "depth_0_connections": 1,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "objects_at_0": [
+      {
+        "index": 0,
+        "class": "array"
+      },
+      {
+        "index": 1,
+        "class": "metro"
+      },
+      {
+        "index": 2,
+        "class": "tabwrite"
+      }
+    ],
+    "connections_at_0": [
+      {
+        "src": 1,
+        "outlet": 0,
+        "dst": 2,
+        "inlet": 0
+      }
+    ],
+    "_note": "#X array is an indexed gobj in Pd (glist_add); array=0, metro=1, tabwrite=2, so connect 1 0 2 0 is in range."
+  },
   "handcrafted/orphans.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 1,
     "max_depth": 0,
-    "orphan_indices": [2, 3, 4],
+    "orphan_indices": [
+      2,
+      3,
+      4
+    ],
     "_note": "osc~ (2), text (3), and f 42 (4) are orphans. loadbang (0) and print (1) are connected."
   },
-
   "handcrafted/displays.pd": {
     "depth_0_objects": 7,
     "depth_0_connections": 4,
     "max_depth": 0,
-    "display_indices": [1, 2, 5],
+    "display_indices": [
+      1,
+      2,
+      5
+    ],
     "_note": "floatatom (1), symbolatom (2), nbx (5) are display objects. 1 and 5 are connected."
   },
-
   "handcrafted/signal_chain.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 5,
     "max_depth": 0,
     "_note": "All objects are signal-rate (~). Last connection goes to both dac~ inlets."
   },
-
   "handcrafted/with_c_entry.pd": {
     "depth_0_objects": 7,
     "depth_0_connections": 3,
@@ -279,28 +530,23 @@
     "has_c_entry": true,
     "_note": "#C restore is NOT an object. Must not affect indexing."
   },
-
   "handcrafted/large_patch.pd": {
     "depth_0_objects": 120,
     "max_depth": 0,
     "_note": "Performance baseline. 120 objects, ~130 connections."
   },
-
   "handcrafted/empty_file.pd": {
     "should_error": true,
     "error_type": "empty_file"
   },
-
   "handcrafted/malformed_missing_semicolon.pd": {
     "should_warn": true,
-    "_note": "loadbang line missing semicolon — may parse differently depending on strategy"
+    "_note": "loadbang line missing semicolon \u2014 may parse differently depending on strategy"
   },
-
   "handcrafted/malformed_bad_connection.pd": {
     "should_fail_validation": true,
     "_note": "connect 0 0 5 0 references index 5 but only 2 objects exist"
   },
-
   "handcrafted/send_receive_lint.pd": {
     "depth_0_objects": 7,
     "depth_0_connections": 0,
@@ -308,7 +554,6 @@
     "canvas_count": 1,
     "_note": "Fixture for lint --send-receive: orphan send, dead receive, matched pair, gui send, signal s~/r~ pair"
   },
-
   "handcrafted/fan_out_lint.pd": {
     "depth_0_objects": 6,
     "depth_0_connections": 4,
@@ -316,7 +561,6 @@
     "canvas_count": 1,
     "_note": "Fixture for lint --fan-out: bng (control) fans out to two prints; osc~ (signal) fans out to two *~ (must not warn)"
   },
-
   "handcrafted/dsp_loop_lint.pd": {
     "depth_0_objects": 7,
     "depth_0_connections": 6,
@@ -324,17 +568,40 @@
     "canvas_count": 1,
     "_note": "Fixture for lint --dsp-loop: signal cycle osc~ <-> *~, linear chain phasor~->*~->dac~, control cycle f<->+ (must not flag)"
   },
-
   "handcrafted/classic_array_save_flags.pd": {
     "_note": "Exercises classic K save_flag bitfield: K=0 default, K=3 saveit+points, K=9 saveit+hidename, K=abc malformed.",
     "arrays_classic": [
-      {"name": "nosave_default", "size": 4, "save_flag": 0, "saveit": false, "filestyle": "polygon", "hidename": false},
-      {"name": "saved_points", "size": 4, "save_flag": 3, "saveit": true, "filestyle": "points", "hidename": false},
-      {"name": "hidden_polygon", "size": 4, "save_flag": 9, "saveit": true, "filestyle": "polygon", "hidename": true},
-      {"name": "malformed_save", "size": 4, "save_flag": null}
+      {
+        "name": "nosave_default",
+        "size": 4,
+        "save_flag": 0,
+        "saveit": false,
+        "filestyle": "polygon",
+        "hidename": false
+      },
+      {
+        "name": "saved_points",
+        "size": 4,
+        "save_flag": 3,
+        "saveit": true,
+        "filestyle": "points",
+        "hidename": false
+      },
+      {
+        "name": "hidden_polygon",
+        "size": 4,
+        "save_flag": 9,
+        "saveit": true,
+        "filestyle": "polygon",
+        "hidename": true
+      },
+      {
+        "name": "malformed_save",
+        "size": 4,
+        "save_flag": null
+      }
     ]
   },
-
   "corpus/array_define_real.pd": {
     "_note": "Real-corpus regression for `array define`. 319 verbatim corpus rows + 2 subpatch rows + 19 synthetic rows = 340 define rows; 1 classic row; cross-kind duplicate sample_d_form.",
     "arrays_define_count": 340,
@@ -342,65 +609,168 @@
     "parse_status_clean_count": 336,
     "parse_status_partial_count": 4,
     "is_template_count": 114,
-    "cross_kind_duplicates": ["sample_d_form"],
+    "cross_kind_duplicates": [
+      "sample_d_form"
+    ],
     "synthetic_payloads": {
       "sample_unknown_guard": {
         "name": "sample_unknown_guard",
         "size": 32,
         "define": {
-          "k": false, "yrange": null, "pix": null,
-          "discarded_tokens": [{"reason": "unknown_flag", "tokens": ["-newflag", "arg1", "arg2"]}],
+          "k": false,
+          "yrange": null,
+          "pix": null,
+          "discarded_tokens": [
+            {
+              "reason": "unknown_flag",
+              "tokens": [
+                "-newflag",
+                "arg1",
+                "arg2"
+              ]
+            }
+          ],
           "parse_status": "partial"
         }
       },
       "sample_superseded": {
         "define": {
-          "k": false, "yrange": [0, 128], "pix": null,
-          "discarded_tokens": [{"reason": "superseded_yrange", "tokens": ["-yrange", "0", "64"]}],
+          "k": false,
+          "yrange": [
+            0,
+            128
+          ],
+          "pix": null,
+          "discarded_tokens": [
+            {
+              "reason": "superseded_yrange",
+              "tokens": [
+                "-yrange",
+                "0",
+                "64"
+              ]
+            }
+          ],
           "parse_status": "partial"
         }
       },
       "sample_malformed_yrange": {
         "define": {
-          "k": false, "yrange": null, "pix": null,
-          "discarded_tokens": [{"reason": "malformed_yrange", "tokens": ["-yrange", "notanum", "nope"]}],
+          "k": false,
+          "yrange": null,
+          "pix": null,
+          "discarded_tokens": [
+            {
+              "reason": "malformed_yrange",
+              "tokens": [
+                "-yrange",
+                "notanum",
+                "nope"
+              ]
+            }
+          ],
           "parse_status": "partial"
         }
       },
       "sample_partial_yrange": {
         "define": {
-          "k": false, "yrange": null, "pix": null,
-          "discarded_tokens": [{"reason": "unknown_flag", "tokens": ["-yrange", "5"]}],
+          "k": false,
+          "yrange": null,
+          "pix": null,
+          "discarded_tokens": [
+            {
+              "reason": "unknown_flag",
+              "tokens": [
+                "-yrange",
+                "5"
+              ]
+            }
+          ],
           "parse_status": "partial"
         }
       },
       "sample_all_flags": {
-        "define": {"k": true, "yrange": [0, 128], "pix": [600, 400], "discarded_tokens": [], "parse_status": "clean"}
+        "define": {
+          "k": true,
+          "yrange": [
+            0,
+            128
+          ],
+          "pix": [
+            600,
+            400
+          ],
+          "discarded_tokens": [],
+          "parse_status": "clean"
+        }
       },
       "sample_float_yrange": {
-        "define": {"yrange": [0.5, 1.5], "parse_status": "clean"}
+        "define": {
+          "yrange": [
+            0.5,
+            1.5
+          ],
+          "parse_status": "clean"
+        }
       },
       "sample_degenerate_yrange": {
-        "define": {"yrange": [5, 5], "parse_status": "clean"}
+        "define": {
+          "yrange": [
+            5,
+            5
+          ],
+          "parse_status": "clean"
+        }
       },
       "sample_pix_subclamp": {
-        "define": {"pix": [5, 5], "parse_status": "clean"}
+        "define": {
+          "pix": [
+            5,
+            5
+          ],
+          "parse_status": "clean"
+        }
       },
       "sample_negative_yrange": {
-        "define": {"yrange": [-1, 1], "parse_status": "clean"}
+        "define": {
+          "yrange": [
+            -1,
+            1
+          ],
+          "parse_status": "clean"
+        }
       },
       "sample_negative_float_yrange": {
-        "define": {"yrange": [-10.5, 10.5], "parse_status": "clean"}
+        "define": {
+          "yrange": [
+            -10.5,
+            10.5
+          ],
+          "parse_status": "clean"
+        }
       },
       "sample_repeated_k": {
-        "define": {"k": true, "discarded_tokens": [], "parse_status": "clean"}
+        "define": {
+          "k": true,
+          "discarded_tokens": [],
+          "parse_status": "clean"
+        }
       },
       "-dashname_divergence": {
-        "name": "-dashname_divergence", "size": 16,
-        "define": {"k": false, "discarded_tokens": [], "parse_status": "clean"}
+        "name": "-dashname_divergence",
+        "size": 16,
+        "define": {
+          "k": false,
+          "discarded_tokens": [],
+          "parse_status": "clean"
+        }
       },
-      "synth_$0_buffer": {"is_template": false},
-      "weird_$10_name": {"is_template": true}
+      "synth_$0_buffer": {
+        "is_template": false
+      },
+      "weird_$10_name": {
+        "is_template": true
+      }
     }
   }
 }

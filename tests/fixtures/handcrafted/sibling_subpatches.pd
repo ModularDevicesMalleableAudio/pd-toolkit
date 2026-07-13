@@ -1,0 +1,18 @@
+#N canvas 0 22 450 300 12;
+#N canvas 0 22 200 200 sub_a 0;
+#X obj 30 30 inlet;
+#X obj 30 60 osc~ 440;
+#X obj 30 90 outlet~;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X restore 50 50 pd sub_a;
+#N canvas 0 22 200 200 sub_b 0;
+#X obj 30 30 inlet;
+#X obj 30 60 phasor~ 220;
+#X obj 30 90 outlet~;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X restore 50 100 pd sub_b;
+#X obj 50 200 dac~;
+#X connect 0 0 2 0;
+#X connect 1 0 2 0;

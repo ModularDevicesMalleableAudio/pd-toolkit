@@ -61,6 +61,7 @@ fn main() {
         Some(Commands::Insert {
             file,
             depth,
+            canvas,
             index,
             entry,
             in_place,
@@ -70,6 +71,7 @@ fn main() {
             match commands::insert::run(
                 &file,
                 depth,
+                canvas,
                 index,
                 &entry,
                 in_place,
@@ -91,6 +93,7 @@ fn main() {
         Some(Commands::Delete {
             file,
             depth,
+            canvas,
             index,
             subpatch,
             in_place,
@@ -100,6 +103,7 @@ fn main() {
             match commands::delete::run(
                 &file,
                 depth,
+                canvas,
                 index,
                 subpatch,
                 in_place,
@@ -287,6 +291,7 @@ fn main() {
         Some(Commands::Modify {
             file,
             depth,
+            canvas,
             index,
             text,
             in_place,
@@ -296,6 +301,7 @@ fn main() {
             match commands::modify::run(
                 &file,
                 depth,
+                canvas,
                 index,
                 &text,
                 in_place,
@@ -317,6 +323,7 @@ fn main() {
         Some(Commands::Connect {
             file,
             depth,
+            canvas,
             src,
             outlet,
             dst,
@@ -328,6 +335,7 @@ fn main() {
             match commands::connect::run(commands::connect::RunArgs {
                 file: &file,
                 depth,
+                canvas,
                 src,
                 outlet,
                 dst,
@@ -351,6 +359,7 @@ fn main() {
         Some(Commands::Disconnect {
             file,
             depth,
+            canvas,
             src,
             outlet,
             dst,
@@ -362,6 +371,7 @@ fn main() {
             match commands::disconnect::run(commands::disconnect::RunArgs {
                 file: &file,
                 depth,
+                canvas,
                 src,
                 outlet,
                 dst,
@@ -386,8 +396,9 @@ fn main() {
             file,
             index,
             depth,
+            canvas,
             json,
-        }) => match commands::connections::run(&file, index, depth, json) {
+        }) => match commands::connections::run(&file, index, depth, canvas, json) {
             Ok(out) => {
                 if !out.is_empty() {
                     println!("{out}");
@@ -451,13 +462,50 @@ fn main() {
                 e.exit_code()
             }
         },
+        Some(Commands::Subpatch {
+            file,
+            depth,
+            canvas,
+            index,
+            name,
+            inlets,
+            outlets,
+            in_place,
+            backup,
+            output,
+        }) => {
+            match commands::subpatch::run(commands::subpatch::RunArgs {
+                file: &file,
+                depth,
+                canvas,
+                index,
+                name: &name,
+                inlets,
+                outlets,
+                in_place,
+                backup,
+                output: output.as_deref(),
+            }) {
+                Ok((serialized, code)) => {
+                    if !in_place && output.is_none() {
+                        print!("{serialized}");
+                    }
+                    code
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
+        }
         Some(Commands::Extract {
             file,
             depth,
+            index,
             output,
             in_place,
             backup,
-        }) => match commands::extract::run(&file, depth, &output, in_place, backup) {
+        }) => match commands::extract::run(&file, depth, index, &output, in_place, backup) {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("{e}");

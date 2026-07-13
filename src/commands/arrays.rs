@@ -64,6 +64,8 @@ struct Row {
     is_template: bool,
     define: Option<DefinePayload>,
     classic: Option<ClassicPayload>,
+    /// Graph geometry from the containing canvas's `#X coords`, if any.
+    graph: Option<Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,7 +166,19 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
         for e in &patch.entries {
             match e.kind {
                 EntryKind::Array => {
-                    if let Some(row) = parse_classic(&e.raw, &file_str, e.depth) {
+                    if let Some(mut row) = parse_classic(&e.raw, &file_str, e.depth) {
+                        // Classic arrays are indexed gobjs; report their
+                        // object index like `array define` rows.
+                        row.index = e.object_index;
+                        // Attach graph geometry from the containing canvas's
+                        // `#X coords`, when the array is graph-displayed.
+                        if let Some(cid) = e.canvas_id {
+                            row.graph = patch
+                                .entries
+                                .iter()
+                                .find(|c| c.kind == EntryKind::Coords && c.canvas_id == Some(cid))
+                                .and_then(|c| parse_coords(&c.raw));
+                        }
                         rows.push(row);
                     } else if cfg.verbose {
                         eprintln!(
@@ -179,7 +193,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                         parse_define(&e.raw, &file_str, e.depth, e.object_index, cfg.verbose)
                     {
                         match parsed {
-                            DefineParse::Row(row) => rows.push(row),
+                            DefineParse::Row(row) => rows.push(*row),
                             DefineParse::Malformed(msg) => {
                                 if cfg.verbose {
                                     eprintln!("warning: {file_str}: {msg}");
@@ -190,6 +204,18 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                 }
                 _ => {}
             }
+        }
+    }
+
+    // When `--kind` was not given it defaults to `classic`, which hides every
+    // `array define` row. Emit an actionable note (not gated on --verbose) so
+    // an all-`array define` file does not silently report "No arrays found".
+    if cfg.kind.is_none() && kind_filter == KindFilter::Classic {
+        let hidden = rows.iter().filter(|r| r.kind == RowKind::Define).count();
+        if hidden > 0 {
+            eprintln!(
+                "note: {hidden} `array define` object(s) hidden; pass --kind all to include them"
+            );
         }
     }
 
@@ -226,7 +252,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
 }
 
 enum DefineParse {
-    Row(Row),
+    Row(Box<Row>),
     Malformed(String),
 }
 
@@ -257,7 +283,43 @@ fn parse_classic(raw: &str, file: &str, internal_depth: usize) -> Option<Row> {
         is_template,
         define: None,
         classic: Some(ClassicPayload { save_flag }),
+        graph: None,
     })
+}
+
+/// Parse an `#X coords x1 y1 x2 y2 pixwidth pixheight [flag] [xmargin ymargin]`
+/// entry into structured graph geometry.
+fn parse_coords(raw: &str) -> Option<Value> {
+    let parts: Vec<&str> = raw
+        .trim()
+        .trim_end_matches(';')
+        .split_whitespace()
+        .collect();
+    if parts.len() < 8 || parts[0] != "#X" || parts[1] != "coords" {
+        return None;
+    }
+    let x_from = parse_number(parts[2])?;
+    let y_top = parse_number(parts[3])?;
+    let x_to = parse_number(parts[4])?;
+    let y_bottom = parse_number(parts[5])?;
+    let pix_width = parts[6].parse::<i64>().ok()?;
+    let pix_height = parts[7].parse::<i64>().ok()?;
+
+    let mut obj = serde_json::Map::new();
+    obj.insert("x_from".into(), Value::Number(x_from));
+    obj.insert("y_top".into(), Value::Number(y_top));
+    obj.insert("x_to".into(), Value::Number(x_to));
+    obj.insert("y_bottom".into(), Value::Number(y_bottom));
+    obj.insert("pix_width".into(), json!(pix_width));
+    obj.insert("pix_height".into(), json!(pix_height));
+    // New-style GOP coords carry x/y margins after the flag token.
+    if parts.len() >= 11
+        && let (Ok(xm), Ok(ym)) = (parts[9].parse::<i64>(), parts[10].parse::<i64>())
+    {
+        obj.insert("x_margin".into(), json!(xm));
+        obj.insert("y_margin".into(), json!(ym));
+    }
+    Some(Value::Object(obj))
 }
 
 /// Try to parse an `#X obj ... array (define|d) ...` entry.  Returns `None` if
@@ -444,7 +506,7 @@ fn parse_define(
         }
     }
 
-    Some(DefineParse::Row(Row {
+    Some(DefineParse::Row(Box::new(Row {
         file: file.to_string(),
         depth: internal_depth.saturating_sub(1),
         index: object_index,
@@ -454,7 +516,8 @@ fn parse_define(
         is_template,
         define: Some(payload),
         classic: None,
-    }))
+        graph: None,
+    })))
 }
 
 /// Parse a numeric token for `-yrange`/`-pix`.  Emits an integer-typed
@@ -602,6 +665,9 @@ fn row_to_json_v2(r: &Row) -> Value {
                 "parse_status": parse_status,
             }),
         );
+    }
+    if let Some(g) = &r.graph {
+        obj.insert("graph".into(), g.clone());
     }
     if let Some(c) = &r.classic {
         let save_flag = match c.save_flag {

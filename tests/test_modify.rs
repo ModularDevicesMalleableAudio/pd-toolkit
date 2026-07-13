@@ -1,5 +1,5 @@
 mod integration;
-use integration::{handcrafted, pdtk_output, run_pdtk, stdout_string};
+use integration::{handcrafted, pdtk_output, run_pdtk};
 
 #[test]
 fn modify_changes_class_and_args() {
@@ -465,4 +465,87 @@ fn modify_validates_after_mutation() {
 
     let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(v.status.code(), Some(0));
+}
+
+#[test]
+fn modify_preserves_inline_width_hint_by_default() {
+    // Editing an object's contents must keep its `, f N` box-width hint when
+    // the new --text does not specify one.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 t b b b, f 154;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "t b b b b",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X obj 50 50 t b b b b, f 154;"),
+        "width hint should be preserved, got:\n{result}"
+    );
+}
+
+#[test]
+fn modify_uses_explicit_width_hint_from_text() {
+    // A width hint in --text overrides the existing one (no duplication).
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 t b b b, f 154;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "t b b b b, f 200",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X obj 50 50 t b b b b, f 200;"),
+        "got:\n{result}"
+    );
+    assert!(
+        !result.contains("f 154"),
+        "old hint should be gone, got:\n{result}"
+    );
+}
+
+#[test]
+fn modify_object_without_hint_stays_hintless() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        "print foo",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("#X obj 50 50 print foo;"), "got:\n{result}");
+    assert!(!result.contains(", f "), "no hint expected, got:\n{result}");
 }

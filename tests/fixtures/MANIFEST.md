@@ -15,6 +15,7 @@ Object indices are annotated in comments where relevant.
 | `nested_subpatch.pd` | 2-level nesting | 3+3 | 2+2 | Depth tracking, restore indexing |
 | `deep_subpatch.pd` | 4-level nesting | 3+3+3+3 | 2+2+2+2 | Deep depth stack |
 | `multiple_subpatches.pd` | 2 sibling subpatches | 5+3+3 | 4+2+2 | Parallel subpatches at same depth |
+| `sibling_subpatches.pd` | 2 sibling `pd` subpatches + dac~ | 3+3+3 | 2+2+2 | Canvas-scoped addressing (`--canvas N` disambiguation) |
 | `multiline_obj.pd` | Multi-line msg entry | 3 | 2 | `;` on different line than `#X` |
 | `escaped_chars.pd` | `\$`, `\,` escapes | 4 | 3 | Escape preservation |
 | `escaped_semicolons.pd` | `\;` in messages | 4 | 3 | `\;` must not split entry |
@@ -34,6 +35,7 @@ Object indices are annotated in comments where relevant.
 | `fan_out_lint.pd` | Lint --fan-out | 6 | 4 | Control fan-out from bng (warn); signal fan-out from osc~ (no warn) |
 | `dsp_loop_lint.pd` | Lint --dsp-loop | 7 | 6 | Signal cycle, linear chain, control cycle (no warn) |
 | `arrays.pd` | Array definitions | 5 | 2 | Array inventory |
+| `array_in_canvas.pd` | Bare `#X array` beside connected objects | 3 | 1 | `#X array` is an indexed gobj (Pd `glist_add`); connection index math must count it |
 | `classic_array_save_flags.pd` | `#X array … float K` save flag bitfield | 4 | 0 | K=0/3/9/abc (saveit, filestyle enum, hidename, malformed) |
 | `orphans.pd` | Unconnected objects | 5 | 1 | Orphan detection |
 | `displays.pd` | Connected debug displays | 7 | 4 | Display finder |

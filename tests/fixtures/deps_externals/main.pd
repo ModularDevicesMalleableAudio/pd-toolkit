@@ -1,0 +1,8 @@
+#N canvas 0 22 450 300 12;
+#X obj 50 50 lua_obj;
+#X obj 50 100 lua_lib_obj;
+#X obj 50 150 pat_obj;
+#X obj 50 200 folder_obj;
+#X obj 50 250 compiled_obj;
+#X obj 50 300 truly_missing;
+#X obj 50 350 print;

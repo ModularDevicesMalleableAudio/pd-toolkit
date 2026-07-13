@@ -1,5 +1,5 @@
 mod integration;
-use integration::{handcrafted, pdtk_output, run_pdtk, stdout_string};
+use integration::{handcrafted, pdtk_output, run_pdtk};
 
 fn with_copy(name: &str) -> (tempfile::NamedTempFile, String) {
     let src = std::fs::read_to_string(handcrafted(name)).unwrap();
@@ -361,4 +361,40 @@ fn rename_send_handles_listbox_receive_field() {
     ]);
     let result = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(result.contains("list_recv_renamed"));
+}
+
+#[test]
+fn rename_send_handles_inline_width_hint() {
+    // A send/receive object whose name is the last token before a `, f N`
+    // width hint must still be renamed, and the hint must be preserved.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 s clock_bus, f 42;\n\
+                 #X obj 200 200 r clock_bus, f 20;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "clock_bus",
+        "--to",
+        "master_clock",
+        "--in-place",
+    ]);
+    assert!(out.contains("2 replacement"), "got:\n{out}");
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X obj 50 50 s master_clock, f 42;"),
+        "got:\n{result}"
+    );
+    assert!(
+        result.contains("#X obj 200 200 r master_clock, f 20;"),
+        "got:\n{result}"
+    );
+    assert!(
+        !result.contains("clock_bus"),
+        "old name should be gone, got:\n{result}"
+    );
 }

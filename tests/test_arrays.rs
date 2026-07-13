@@ -536,3 +536,86 @@ fn arrays_define_dollar_zero_is_not_template() {
     assert_eq!(row["name"], "synth_$0_buffer");
     assert_eq!(row["is_template"], false);
 }
+
+#[test]
+fn arrays_default_notes_hidden_define_objects() {
+    // A file containing only `array define` objects must not silently report
+    // "No arrays found" under the default (classic) filter: it should note the
+    // hidden rows on stderr and point at `--kind all`.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 array define arr1 4;\n\
+                 #A 0 0.25 0.5 0.75;\n";
+    let tmp = tempfile::Builder::new().suffix(".pd").tempfile().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let path = tmp.path().to_str().unwrap();
+
+    let out = run_pdtk(&["arrays", path]);
+    let err = stderr_string(&out);
+    assert!(
+        err.contains("array define") && err.contains("--kind all"),
+        "expected a hint about hidden define rows, got stderr:\n{err}"
+    );
+
+    // With --kind all the define row is listed.
+    let listed = pdtk_output(&["arrays", path, "--kind", "all"]);
+    assert!(listed.contains("arr1"), "got:\n{listed}");
+}
+
+#[test]
+fn arrays_no_note_when_kind_explicit() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 array define arr1 4;\n";
+    let tmp = tempfile::Builder::new().suffix(".pd").tempfile().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let path = tmp.path().to_str().unwrap();
+
+    let out = run_pdtk(&["arrays", path, "--kind", "classic"]);
+    assert!(
+        !stderr_string(&out).contains("hidden"),
+        "explicit --kind classic should not emit the hidden-rows note"
+    );
+}
+
+#[test]
+fn arrays_classic_exposes_graph_geometry() {
+    // A graph-displayed classic array's containing subcanvas carries an
+    // `#X coords` line; its geometry must be surfaced structurally.
+    let f = handcrafted("with_graph.pd");
+    let out = pdtk_output(&["arrays", f.to_str().unwrap(), "--kind", "classic", "--json"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let arr = &v["arrays"][0];
+    assert_eq!(arr["name"], "my_array");
+    let g = &arr["graph"];
+    assert_eq!(g["x_from"], 0, "got:\n{out}");
+    assert_eq!(g["x_to"], 99, "got:\n{out}");
+    assert_eq!(g["y_top"], 1, "got:\n{out}");
+    assert_eq!(g["y_bottom"], -1, "got:\n{out}");
+    assert_eq!(g["pix_width"], 200, "got:\n{out}");
+    assert_eq!(g["pix_height"], 140, "got:\n{out}");
+}
+
+#[test]
+fn arrays_classic_without_graph_has_no_geometry() {
+    // A bare `#X array` in a normal canvas (no `#X coords`) reports null graph.
+    let f = handcrafted("array_in_canvas.pd");
+    let out = pdtk_output(&["arrays", f.to_str().unwrap(), "--kind", "classic", "--json"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let arr = &v["arrays"][0];
+    assert_eq!(arr["name"], "data_arr");
+    assert!(arr["graph"].is_null(), "expected null graph; got:\n{out}");
+}
+
+#[test]
+fn arrays_classic_row_reports_object_index() {
+    // Classic `#X array` entries are indexed gobjs now; the JSON row must
+    // carry the object index like `array define` rows do, not null.
+    let f = handcrafted("array_in_canvas.pd");
+    let out = pdtk_output(&["arrays", f.to_str().unwrap(), "--kind", "classic", "--json"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let arr = &v["arrays"][0];
+    assert_eq!(arr["name"], "data_arr");
+    assert_eq!(
+        arr["index"], 0,
+        "classic array occupies object index 0; got:\n{out}"
+    );
+}

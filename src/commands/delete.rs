@@ -1,4 +1,4 @@
-use crate::commands::common::validate_patch;
+use crate::commands::common::{is_array_define, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
 use pdtk::model::EntryKind;
@@ -15,9 +15,11 @@ use pdtk::rewrite::serialize;
 ///
 /// When `subpatch` is false, behavior is the existing "delete object at
 /// `--depth D --index I`" semantics.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     file: &str,
     depth: usize,
+    canvas: usize,
     index: Option<usize>,
     subpatch: bool,
     in_place: bool,
@@ -28,7 +30,7 @@ pub fn run(
     let tok = tokenize_entries(&input);
     let mut entries = build_entries(&tok.entries);
 
-    let (span_start, delete_pos, target_index, connection_depth) = if subpatch {
+    let (span_start, delete_pos, target_index, conn_canvas_id) = if subpatch {
         if depth == 0 {
             return Err(PdtkError::Usage(
                 "cannot delete the root canvas".to_string(),
@@ -39,13 +41,13 @@ pub fn run(
         let idx = index.ok_or_else(|| {
             PdtkError::Usage("--index is required unless --subpatch is given".to_string())
         })?;
-        find_object_span(&entries, depth, idx)?
+        find_object_span(&entries, depth, canvas, idx)?
     };
 
     // Drain trailing WidthHint after the deleted span (applies to both
     // paths: an `#X f N` immediately following the restore belongs to
     // it and must be removed too).
-    let end_inclusive = if delete_pos + 1 < entries.len()
+    let mut end_inclusive = if delete_pos + 1 < entries.len()
         && entries[delete_pos + 1].kind == EntryKind::WidthHint
         && entries[delete_pos].kind == EntryKind::Restore
         && entries[delete_pos + 1].depth == entries[delete_pos].depth
@@ -55,11 +57,22 @@ pub fn run(
         delete_pos
     };
 
+    // `#A` records bind to the immediately preceding array definition
+    // (classic `#X array` or `array define`); leaving them behind detaches
+    // the saved samples, so they are deleted with the array.
+    if entries[delete_pos].kind == EntryKind::Array || is_array_define(&entries[delete_pos]) {
+        while end_inclusive + 1 < entries.len()
+            && entries[end_inclusive + 1].kind == EntryKind::ArrayData
+        {
+            end_inclusive += 1;
+        }
+    }
+
     entries.drain(span_start..=end_inclusive);
 
-    // Remove parent-depth connections that reference target_index
+    // Remove connections in the target canvas that reference target_index
     entries.retain(|e| {
-        if e.kind != EntryKind::Connect || e.depth != connection_depth {
+        if e.kind != EntryKind::Connect || e.canvas_id != Some(conn_canvas_id) {
             return true;
         }
         let parts: Vec<&str> = e
@@ -76,9 +89,9 @@ pub fn run(
         src != target_index && dst != target_index
     });
 
-    // Renumber: src/dst > target_index → -1
+    // Renumber: src/dst > target_index → -1 (within the target canvas)
     for e in &mut *entries {
-        if e.kind != EntryKind::Connect || e.depth != connection_depth {
+        if e.kind != EntryKind::Connect || e.canvas_id != Some(conn_canvas_id) {
             continue;
         }
         let parts: Vec<&str> = e
@@ -137,18 +150,28 @@ pub fn run(
 }
 
 /// Find the span for the default (non-subpatch) delete path.
-/// Returns `(span_start, delete_pos, target_index, connection_depth)`.
+/// Returns `(span_start, delete_pos, target_index, conn_canvas_id)`, where
+/// `conn_canvas_id` is the canvas whose connections must be adjusted.
 fn find_object_span(
     entries: &[pdtk::model::Entry],
     user_depth: usize,
+    canvas: usize,
     index: usize,
 ) -> Result<(usize, usize, usize, usize), PdtkError> {
-    let internal_depth = user_depth + 1;
+    let canvas_id =
+        pdtk::model::resolve_canvas_id(entries, user_depth, canvas).ok_or_else(|| {
+            PdtkError::Usage(format!(
+                "no canvas {canvas} at depth {user_depth} ({} at this depth)",
+                pdtk::model::canvas_ids_at_depth(entries, user_depth).len()
+            ))
+        })?;
     let delete_pos = entries
         .iter()
-        .position(|e| e.depth == internal_depth && e.object_index == Some(index))
+        .position(|e| e.canvas_id == Some(canvas_id) && e.object_index == Some(index))
         .ok_or_else(|| {
-            PdtkError::Usage(format!("no object at depth {user_depth}, index {index}"))
+            PdtkError::Usage(format!(
+                "no object at depth {user_depth}, canvas {canvas}, index {index}"
+            ))
         })?;
 
     let span_start = if entries[delete_pos].kind == EntryKind::Restore {
@@ -176,14 +199,18 @@ fn find_object_span(
         delete_pos
     };
 
-    // connection_depth = target entry's depth (for both Restore and
-    // non-Restore targets, this equals user_depth + 1 in this path).
-    let connection_depth = entries[delete_pos].depth;
-    Ok((span_start, delete_pos, index, connection_depth))
+    // The connections to adjust live in the deleted entry's own canvas
+    // (its parent canvas when the target is a restore box).
+    let conn_canvas_id = entries[delete_pos].canvas_id.ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "object at depth {user_depth}, canvas {canvas}, index {index} has no canvas id"
+        ))
+    })?;
+    Ok((span_start, delete_pos, index, conn_canvas_id))
 }
 
 /// Find the span for the `--subpatch` path.
-/// Returns `(span_start, delete_pos, target_index, connection_depth)`.
+/// Returns `(span_start, delete_pos, target_index, conn_canvas_id)`.
 fn find_subpatch_span(
     entries: &[pdtk::model::Entry],
     user_depth: usize,
@@ -233,7 +260,13 @@ fn find_subpatch_span(
             "restore at depth {user_depth} index {n} has no object_index"
         ))
     })?;
-    let connection_depth = restore.depth;
+    // Parent connections that reference the restore box live in the restore's
+    // own (parent) canvas.
+    let conn_canvas_id = restore.canvas_id.ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "restore at depth {user_depth} index {n} has no canvas id"
+        ))
+    })?;
 
-    Ok((canvas_pos, restore_pos, target_index, connection_depth))
+    Ok((canvas_pos, restore_pos, target_index, conn_canvas_id))
 }

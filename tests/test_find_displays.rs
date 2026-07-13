@@ -100,3 +100,43 @@ fn displays_finds_listbox() {
     ]);
     assert!(out.contains("listbox"), "output was: {out}");
 }
+
+#[test]
+fn displays_delete_targets_correct_sibling_canvas() {
+    // Only sub_b's floatatom is connected (a display). sub_a's floatatom at
+    // the same depth/index is unconnected; depth-merged detection would flag
+    // it too, and a depth-scoped delete removes sub_a's objects instead.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #N canvas 0 22 200 200 sub_a 0;\n\
+                 #X floatatom 30 30 5 0 0 0 keepme - -;\n\
+                 #X obj 30 60 osc~ 440;\n\
+                 #X restore 50 50 pd sub_a;\n\
+                 #N canvas 0 22 200 200 sub_b 0;\n\
+                 #X floatatom 30 30 5 0 0 0 delme - -;\n\
+                 #X obj 30 60 f;\n\
+                 #X connect 1 0 0 0;\n\
+                 #X restore 50 100 pd sub_b;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    run_pdtk(&[
+        "find-displays",
+        tmp.path().to_str().unwrap(),
+        "--delete",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        !result.contains("delme"),
+        "sub_b's connected display must be deleted:\n{result}"
+    );
+    assert!(
+        result.contains("keepme"),
+        "sub_a's unconnected floatatom must survive:\n{result}"
+    );
+    assert!(
+        result.contains("osc~ 440"),
+        "sub_a's osc~ must survive:\n{result}"
+    );
+}
