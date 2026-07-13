@@ -49,19 +49,18 @@ fn replace_raw_token(
     let (start, end) = ranges[token_pos];
     let token = &raw[start..end];
 
-    // Strip trailing semicolon for the comparison only
-    let value = token.trim_end_matches(';');
-    let has_semi = token.ends_with(';');
+    // Strip trailing entry/width-hint punctuation for the comparison only:
+    // `;` terminates an entry, and `,` precedes an inline `, f N` width hint
+    // when the name is the last content token. Re-attach whatever was stripped
+    // so the terminator and width hint survive the rename.
+    let value = token.trim_end_matches([';', ',']);
+    let suffix = &token[value.len()..];
 
     if value != expected {
         return None;
     }
 
-    let replacement = if has_semi {
-        format!("{new_token};")
-    } else {
-        new_token.to_string()
-    };
+    let replacement = format!("{new_token}{suffix}");
 
     let mut result = raw[..start].to_string();
     result.push_str(&replacement);
@@ -141,7 +140,7 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                 let class = tokens.get(4).copied().unwrap_or("").trim_end_matches(';');
                 if simple_sr_class(class) {
                     if let Some(name) = tokens.get(5) {
-                        let n = name.trim_end_matches(';');
+                        let n = name.trim_end_matches([';', ',']);
                         if n != "empty" && n != "-" {
                             names.insert(n.to_string());
                         }
@@ -149,7 +148,7 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                 } else if let Some((si, ri)) = gui_send_receive_arg_indices(class) {
                     for idx in [5 + si, 5 + ri] {
                         if let Some(tok) = tokens.get(idx) {
-                            let n = tok.trim_end_matches(';');
+                            let n = tok.trim_end_matches([';', ',']);
                             if n != "empty" && n != "-" {
                                 names.insert(n.to_string());
                             }
@@ -158,7 +157,7 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                 } else if class == "vu" {
                     let idx = 5 + vu_receive_arg_index();
                     if let Some(tok) = tokens.get(idx) {
-                        let n = tok.trim_end_matches(';');
+                        let n = tok.trim_end_matches([';', ',']);
                         if n != "empty" && n != "-" {
                             names.insert(n.to_string());
                         }
@@ -169,7 +168,7 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                 for pos in [8, 9] {
                     let toks: Vec<&str> = e.raw.split_whitespace().collect();
                     if let Some(tok) = toks.get(pos) {
-                        let n = tok.trim_end_matches(';');
+                        let n = tok.trim_end_matches([';', ',']);
                         if n != "empty" && n != "-" {
                             names.insert(n.to_string());
                         }

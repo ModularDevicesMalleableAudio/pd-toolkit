@@ -164,6 +164,63 @@ pub fn outlet_count(class: &str, args: &[&str]) -> Option<usize> {
     outlet_types(class, args).map(|v| v.len())
 }
 
+/// Returns the number of inlets for a known object class, or `None` when the
+/// class is unknown (an external/abstraction could have any number of inlets).
+///
+/// This table is deliberately conservative: it only lists classes whose inlet
+/// count is fixed and well-known in vanilla Pd, and never reports fewer inlets
+/// than an object actually has (so a valid patch never produces a false
+/// "inlet out of range" warning).
+#[must_use]
+pub fn inlet_count(class: &str, args: &[&str]) -> Option<usize> {
+    let n = match class {
+        // Sources with no inlets.
+        "loadbang" | "key" | "keyname" | "notein" | "bendin" | "pgmin" | "adc~" => 0,
+
+        // A named receive has no inlets; a bare receive is settable in recent
+        // Pd (it gains an inlet), so report unknown rather than undercount.
+        "receive" | "r" | "receive~" | "r~" => {
+            if args.is_empty() {
+                return None;
+            }
+            0
+        }
+
+        // A named send has one inlet; a bare [send]/[s] gains a right inlet
+        // that sets the destination.
+        "send" | "s" => {
+            if args.is_empty() {
+                2
+            } else {
+                1
+            }
+        }
+
+        // Single-inlet objects (fixed arity).
+        "print" | "bang" | "b" | "trigger" | "t" | "unpack" | "send~" | "s~" | "throw~" | "tgl"
+        | "toggle" | "bng" => 1,
+
+        // pack: one inlet per element (min 2 when unspecified: `pack f f`).
+        "pack" => {
+            if args.is_empty() {
+                2
+            } else {
+                args.len()
+            }
+        }
+
+        // Two-inlet objects (fixed arity). Variable-inlet classes (pipe, line,
+        // clip, dac~, symbol, …) are intentionally omitted to avoid ever
+        // reporting fewer inlets than an object really has.
+        "metro" | "delay" | "del" | "moses" | "swap" | "spigot" | "+" | "-" | "*" | "/" | "%"
+        | "pow" | "min" | "max" | "mod" | "div" | ">" | "<" | ">=" | "<=" | "==" | "!=" | "+~"
+        | "-~" | "*~" | "/~" | "osc~" | "phasor~" => 2,
+
+        _ => return None,
+    };
+    Some(n)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +274,33 @@ mod tests {
     fn signatures_metro_has_bang_outlet() {
         let types = outlet_types("metro", &["500"]).unwrap();
         assert_eq!(types, vec![OutletType::Bang]);
+    }
+
+    #[test]
+    fn inlet_counts_never_undercount_common_classes() {
+        // Regression guards: these must not report fewer inlets than the object
+        // really has, or valid patches produce false warnings.
+        assert_eq!(inlet_count("spigot", &[]), Some(2));
+        assert_eq!(inlet_count("print", &[]), Some(1));
+        assert_eq!(inlet_count("metro", &["500"]), Some(2));
+        assert_eq!(inlet_count("loadbang", &[]), Some(0));
+        // A bare [send]/[s] has a right inlet that sets the destination.
+        assert_eq!(inlet_count("send", &[]), Some(2));
+        assert_eq!(inlet_count("s", &[]), Some(2));
+        assert_eq!(inlet_count("send", &["dest"]), Some(1));
+        // A named receive has no inlets; a bare one is settable (unknown).
+        assert_eq!(inlet_count("receive", &["src"]), Some(0));
+        assert_eq!(inlet_count("r", &[]), None);
+        assert_eq!(inlet_count("pack", &["f", "f", "f"]), Some(3));
+        assert_eq!(inlet_count("pack", &[]), Some(2));
+        // Unknown / variable-arity classes are not reported.
+        assert_eq!(inlet_count("some_external", &[]), None);
+        assert_eq!(inlet_count("clip", &[]), None);
+        assert_eq!(inlet_count("dac~", &[]), None);
+    }
+
+    #[test]
+    fn print_has_no_outlets() {
+        assert_eq!(outlet_count("print", &[]), Some(0));
     }
 }

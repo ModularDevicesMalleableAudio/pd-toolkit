@@ -57,6 +57,20 @@ fn validate_all_corpus_files_exit_0() {
 }
 
 #[test]
+fn validate_counts_array_as_object() {
+    // `#X array` is an indexed gobj in Pd; the connection metro(1)->tabwrite(2)
+    // is only in range when the array (index 0) is counted.
+    let f = handcrafted("array_in_canvas.pd");
+    let out = run_pdtk(&["validate", f.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "array must be counted as an object; stdout:\n{}",
+        stdout_string(&out)
+    );
+}
+
+#[test]
 fn validate_malformed_bad_connection_exits_1() {
     let f = handcrafted("malformed_bad_connection.pd");
     let out = run_pdtk(&["validate", f.to_str().unwrap()]);
@@ -216,4 +230,136 @@ fn validate_output_flag_writes_to_file() {
     );
     let content = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(content.contains("OK: patch is valid"));
+}
+
+#[test]
+fn validate_warns_on_detached_array_data() {
+    // `#A` that does not follow an array definition is orphaned data.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 print;\n\
+                 #A 0 0.25 0.5 0.75;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    // A warning, not an error: exit stays 0.
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        stdout_string(&out).contains("#A array data not attached"),
+        "got:\n{}",
+        stdout_string(&out)
+    );
+}
+
+#[test]
+fn validate_no_warning_for_attached_array_data() {
+    // Classic `#X array` followed by `#A` is well-formed.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X array wf 4 float 3;\n\
+                 #A 0 0.1 0.2 0.3;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(!stdout_string(&out).contains("#A array data not attached"));
+}
+
+#[test]
+fn validate_warns_on_out_of_range_outlet() {
+    // metro has a single outlet (index 0); a wire from outlet 1 is dropped by
+    // Pd on load. validate must warn (exit stays 0).
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 metro 100;\n\
+                 #X obj 50 100 print;\n\
+                 #X connect 0 1 1 0;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "outlet issue is a warning, not error"
+    );
+    assert!(
+        stdout_string(&out).contains("outlet"),
+        "expected an outlet warning; got:\n{}",
+        stdout_string(&out)
+    );
+}
+
+#[test]
+fn validate_warns_on_out_of_range_inlet() {
+    // print has a single inlet (index 0); a wire into inlet 1 is invalid.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 metro 100;\n\
+                 #X obj 50 100 print;\n\
+                 #X connect 0 0 1 1;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        stdout_string(&out).contains("inlet"),
+        "expected an inlet warning; got:\n{}",
+        stdout_string(&out)
+    );
+}
+
+#[test]
+fn validate_no_outlet_warning_for_unknown_class() {
+    // An unknown external could have any number of outlets; do not warn.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 my_external_obj;\n\
+                 #X obj 50 100 print;\n\
+                 #X connect 0 5 1 0;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        !stdout_string(&out).contains("outlet"),
+        "unknown class must not trigger an outlet warning; got:\n{}",
+        stdout_string(&out)
+    );
+}
+
+#[test]
+fn validate_no_outlet_warning_for_valid_connection() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 metro 100;\n\
+                 #X obj 50 100 print;\n\
+                 #X connect 0 0 1 0;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(!s.contains("outlet") && !s.contains("inlet"), "got:\n{s}");
+}
+
+#[test]
+fn validate_no_inlet_warning_for_bare_send_right_inlet() {
+    // `[send]`/`[s]` with no argument has a second inlet that sets the
+    // destination; wiring it is a common idiom and must not warn.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 20 target;\n\
+                 #X obj 50 60 s;\n\
+                 #X obj 120 60 send;\n\
+                 #X connect 0 0 1 1;\n\
+                 #X connect 0 0 2 1;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("inlet"),
+        "bare [send]/[s] right-inlet wiring is valid; got:\n{s}"
+    );
 }

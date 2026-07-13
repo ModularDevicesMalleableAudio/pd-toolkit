@@ -230,3 +230,48 @@ fn extract_in_place_backup_creates_bak() {
     assert_eq!(bak_content, src, ".bak must match original");
     std::fs::remove_file(&bak_path).ok();
 }
+
+#[test]
+fn extract_boundary_analysis_ignores_sibling_canvas_connections() {
+    // `pd inner` (depth 2, inside sub_a) has no boundary connections. sub_b's
+    // contents also sit at depth 2 and contain a connection whose src equals
+    // inner's restore index in sub_a; it must not inflate the inferred
+    // outlet count of the extracted abstraction.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #N canvas 0 22 200 200 sub_a 0;\n\
+                 #X obj 20 20 inlet;\n\
+                 #N canvas 0 22 200 200 inner 0;\n\
+                 #X obj 30 30 osc~ 440;\n\
+                 #X restore 40 40 pd inner;\n\
+                 #X obj 20 100 outlet~;\n\
+                 #X restore 50 50 pd sub_a;\n\
+                 #N canvas 0 22 200 200 sub_b 0;\n\
+                 #X obj 20 20 inlet;\n\
+                 #X obj 20 60 f;\n\
+                 #X obj 20 100 outlet;\n\
+                 #X connect 1 0 2 0;\n\
+                 #X restore 120 50 pd sub_b;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let out_file = tempfile::NamedTempFile::new().unwrap();
+
+    pdtk_output(&[
+        "extract",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "2",
+        "--index",
+        "0",
+        "--output",
+        out_file.path().to_str().unwrap(),
+    ]);
+
+    let extracted = std::fs::read_to_string(out_file.path()).unwrap();
+    assert!(extracted.contains("osc~ 440"), "got:\n{extracted}");
+    assert!(
+        !extracted.contains("outlet"),
+        "no boundary connection references inner; a sibling canvas's \
+         connection must not add outlets:\n{extracted}"
+    );
+    assert!(!extracted.contains("inlet"), "got:\n{extracted}");
+}

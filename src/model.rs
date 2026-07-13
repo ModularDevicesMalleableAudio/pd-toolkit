@@ -39,6 +39,7 @@ pub enum EntryKind {
     Connect,    // #X connect
     Coords,     // #X coords
     Array,      // #X array
+    Scalar,     // #X scalar
     ArrayData,  // #A
     Declare,    // #X declare (standalone, NOT #X obj ... declare)
     WidthHint,  // #X f <number>
@@ -68,8 +69,9 @@ pub struct Entry {
 // Helpers shared by Entry methods
 
 /// Strip the trailing `;` and any trailing `, f <integer>` width hint from a
-/// raw entry string.  Returns a slice of the original.
-fn content_without_width_hint(raw: &str) -> &str {
+/// raw entry string (or bare object text).  Returns a slice of the original.
+#[must_use]
+pub fn content_without_width_hint(raw: &str) -> &str {
     let without_semi = raw.trim().trim_end_matches(';').trim_end();
     if let Some(comma_pos) = without_semi.rfind(", f ") {
         let after = without_semi[comma_pos + 4..].trim();
@@ -78,6 +80,16 @@ fn content_without_width_hint(raw: &str) -> &str {
         }
     }
     without_semi
+}
+
+/// Parse the value of a trailing `, f <integer>` width hint from a raw entry
+/// or bare object text (with or without a trailing `;`).  Returns `None` when
+/// no width hint is present.
+#[must_use]
+pub fn trailing_width_hint(content: &str) -> Option<i32> {
+    let without_semi = content.trim().trim_end_matches(';').trim_end();
+    let comma_pos = without_semi.rfind(", f ")?;
+    without_semi[comma_pos + 4..].trim().parse::<i32>().ok()
 }
 
 /// For GUI objects, returns the (send_arg_index, receive_arg_index) into the
@@ -131,6 +143,7 @@ impl Entry {
             EntryKind::CanvasOpen => "canvas",
             EntryKind::Coords => "coords",
             EntryKind::Array => "array",
+            EntryKind::Scalar => "scalar",
             EntryKind::ArrayData => "data",
             EntryKind::Declare => "declare",
             EntryKind::WidthHint => "width_hint",
@@ -150,6 +163,12 @@ impl Entry {
             .skip(5) // #X obj X Y class → skip 5 tokens
             .map(str::to_owned)
             .collect()
+    }
+
+    /// The inline `, f N` width-hint value, if this entry carries one.
+    #[must_use]
+    pub fn width_hint(&self) -> Option<i32> {
+        trailing_width_hint(&self.raw)
     }
 
     /// X canvas coordinate (pixel position).  Available for all object-like
@@ -280,6 +299,33 @@ impl Connection {
     }
 }
 
+/// Free-function form of `Patch::canvas_ids_at_depth`, for callers working on
+/// a raw entry slice (before wrapping in a `Patch`).  Returns the `canvas_id`s
+/// of the canvases whose direct contents live at `user_depth`, in document
+/// order.
+#[must_use]
+pub fn canvas_ids_at_depth(entries: &[Entry], user_depth: usize) -> Vec<usize> {
+    let mut ids = Vec::new();
+    let mut open_counter = 0usize;
+    for e in entries {
+        if e.kind == EntryKind::CanvasOpen {
+            let own_id = open_counter;
+            open_counter += 1;
+            if e.depth == user_depth {
+                ids.push(own_id);
+            }
+        }
+    }
+    ids
+}
+
+/// Free-function form of `Patch::resolve_canvas`, for callers working on a raw
+/// entry slice.
+#[must_use]
+pub fn resolve_canvas_id(entries: &[Entry], user_depth: usize, nth: usize) -> Option<usize> {
+    canvas_ids_at_depth(entries, user_depth).get(nth).copied()
+}
+
 // Patch
 
 #[derive(Debug, Clone)]
@@ -316,6 +362,61 @@ impl Patch {
         self.entries
             .iter()
             .filter(|e| e.kind == EntryKind::Connect && e.depth == internal)
+            .filter_map(|e| Connection::parse(&e.raw))
+            .collect()
+    }
+
+    /// The `canvas_id`s of the canvases whose direct contents live at
+    /// `user_depth`, in document order.  The position in this vec is the
+    /// user-facing `--canvas N` selector (0 = first sibling at that depth).
+    ///
+    /// A canvas's own id equals its 0-based position among all `#N canvas`
+    /// entries in document order, and its `#N canvas` entry sits at internal
+    /// depth == `user_depth` (its contents are one level deeper).
+    #[must_use]
+    pub fn canvas_ids_at_depth(&self, user_depth: usize) -> Vec<usize> {
+        canvas_ids_at_depth(&self.entries, user_depth)
+    }
+
+    /// Resolve the `canvas_id` of the `nth` canvas at `user_depth` (document
+    /// order).  Returns `None` if there is no such canvas.
+    #[must_use]
+    pub fn resolve_canvas(&self, user_depth: usize, nth: usize) -> Option<usize> {
+        self.canvas_ids_at_depth(user_depth).get(nth).copied()
+    }
+
+    /// The `--canvas N` ordinal of `canvas_id` among its siblings at
+    /// `user_depth`, or `None` if it is not found at that depth.
+    #[must_use]
+    pub fn canvas_ordinal(&self, user_depth: usize, canvas_id: usize) -> Option<usize> {
+        self.canvas_ids_at_depth(user_depth)
+            .iter()
+            .position(|&id| id == canvas_id)
+    }
+
+    /// Number of indexed objects belonging to a specific canvas.
+    #[must_use]
+    pub fn object_count_in_canvas(&self, canvas_id: usize) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.canvas_id == Some(canvas_id) && e.object_index.is_some())
+            .count()
+    }
+
+    /// The entry with object index `idx` belonging to a specific canvas.
+    #[must_use]
+    pub fn object_in_canvas(&self, canvas_id: usize, idx: usize) -> Option<&Entry> {
+        self.entries
+            .iter()
+            .find(|e| e.canvas_id == Some(canvas_id) && e.object_index == Some(idx))
+    }
+
+    /// All connections belonging to a specific canvas.
+    #[must_use]
+    pub fn connections_in_canvas(&self, canvas_id: usize) -> Vec<Connection> {
+        self.entries
+            .iter()
+            .filter(|e| e.kind == EntryKind::Connect && e.canvas_id == Some(canvas_id))
             .filter_map(|e| Connection::parse(&e.raw))
             .collect()
     }
@@ -360,5 +461,38 @@ mod tests {
     #[test]
     fn gui_indices_unknown_class() {
         assert_eq!(gui_send_receive_arg_indices("osc~"), None);
+    }
+
+    #[test]
+    fn width_hint_parsed_from_raw_entry() {
+        let e = Entry {
+            raw: "#X obj 50 50 t b b b, f 154;".to_string(),
+            kind: EntryKind::Obj,
+            depth: 1,
+            object_index: Some(0),
+            canvas_id: Some(0),
+        };
+        assert_eq!(e.width_hint(), Some(154));
+        assert_eq!(e.class(), "t");
+        assert_eq!(e.args(), vec!["b", "b", "b"]);
+    }
+
+    #[test]
+    fn width_hint_absent_returns_none() {
+        let e = Entry {
+            raw: "#X obj 50 50 print;".to_string(),
+            kind: EntryKind::Obj,
+            depth: 1,
+            object_index: Some(0),
+            canvas_id: Some(0),
+        };
+        assert_eq!(e.width_hint(), None);
+    }
+
+    #[test]
+    fn trailing_width_hint_on_bare_text() {
+        assert_eq!(trailing_width_hint("t b b b b, f 200"), Some(200));
+        assert_eq!(trailing_width_hint("t b b b b"), None);
+        assert_eq!(content_without_width_hint("t b b b b, f 200"), "t b b b b");
     }
 }

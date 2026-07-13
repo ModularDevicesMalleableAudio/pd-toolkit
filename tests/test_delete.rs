@@ -966,3 +966,74 @@ fn delete_index_required_without_subpatch_flag() {
         "error should mention --index requirement:\n{err}"
     );
 }
+
+#[test]
+fn delete_array_removes_attached_array_data() {
+    // Deleting an indexed `#X array` must also remove the immediately attached
+    // `#A` records; leaving them behind detaches the saved samples.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X array wave 4 float 3;\n\
+                 #A 0 0.1 0.2 0.3 0.4;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        !result.contains("#X array"),
+        "array must be deleted:\n{result}"
+    );
+    assert!(
+        !result.contains("#A "),
+        "attached array data must be deleted with the array:\n{result}"
+    );
+
+    let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(v.status.code(), Some(0), "stdout:\n{}", stdout_string(&v));
+    assert!(
+        !stdout_string(&v).contains("#A array data not attached"),
+        "delete must not leave detached array data"
+    );
+}
+
+#[test]
+fn delete_array_define_removes_attached_array_data() {
+    // `array define` saves its contents as a following `#A`; deleting the
+    // define must take the data record with it, like classic `#X array`.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 array define arr 4;\n\
+                 #A 0 1 2 3 4;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        !result.contains("array define"),
+        "define must be deleted:\n{result}"
+    );
+    assert!(
+        !result.contains("#A "),
+        "attached array data must be deleted with the define:\n{result}"
+    );
+}

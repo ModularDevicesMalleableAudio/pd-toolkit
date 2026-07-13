@@ -13,6 +13,10 @@ struct OrphanRow {
     depth: usize,
     index: usize,
     text: String,
+    /// Canvas the object belongs to — the deletion scope. Sibling subpatches
+    /// at the same depth have independent index spaces.
+    #[serde(skip)]
+    canvas_id: usize,
 }
 
 pub fn run(
@@ -47,9 +51,18 @@ pub fn run(
             if e.kind == EntryKind::Obj && e.class() == "declare" {
                 continue;
             }
+            // Arrays and scalars are gobjs but are referenced by name
+            // (tabread/tabwrite/struct), never by patch cords, so an
+            // unconnected one is not an orphan.
+            if matches!(e.kind, EntryKind::Array | EntryKind::Scalar) {
+                continue;
+            }
 
+            let Some(cid) = e.canvas_id else { continue };
+            // Connectivity is per canvas: a same-index connection in a
+            // sibling subpatch must not make this object look connected.
             let connected = patch
-                .connections_at_depth(user_depth)
+                .connections_in_canvas(cid)
                 .iter()
                 .any(|c| c.src == idx || c.dst == idx);
             if !connected {
@@ -58,6 +71,7 @@ pub fn run(
                     depth: user_depth,
                     index: idx,
                     text: e.raw.clone(),
+                    canvas_id: cid,
                 });
             }
         }
@@ -77,7 +91,7 @@ pub fn run(
             per_file
                 .entry(r.file.clone())
                 .or_default()
-                .push((r.depth, r.index));
+                .push((r.canvas_id, r.index));
         }
 
         for (file, mut dels) in per_file {
@@ -85,10 +99,10 @@ pub fn run(
             let tok = tokenize_entries(&input);
             let mut entries = build_entries(&tok.entries);
 
-            // delete highest depth/index first to avoid index drift
+            // delete highest canvas/index first to avoid index drift
             dels.sort_by(|a, b| b.cmp(a));
-            for (d, i) in dels {
-                let _ = delete_object(&mut entries, d, i);
+            for (cid, i) in dels {
+                let _ = delete_object(&mut entries, cid, i);
             }
 
             let patch = pdtk::model::Patch {

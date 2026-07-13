@@ -1,13 +1,15 @@
-use crate::commands::common::validate_patch;
+use crate::commands::common::{object_insert_pos, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
 use pdtk::model::{Entry, EntryKind};
 use pdtk::parser::{assign_depth_and_indices, build_entries, classify_entry, tokenize_entries};
 use pdtk::rewrite::serialize;
 
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     file: &str,
     depth: usize,
+    canvas: usize,
     index: usize,
     entry: &str,
     in_place: bool,
@@ -20,15 +22,23 @@ pub fn run(
 
     let internal_depth = depth + 1;
 
-    // Validate: check the target depth exists and index is in range
+    // Resolve the target canvas among siblings at this depth.
+    let canvas_id = pdtk::model::resolve_canvas_id(&entries, depth, canvas).ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "no canvas {canvas} at depth {depth} ({} at this depth)",
+            pdtk::model::canvas_ids_at_depth(&entries, depth).len()
+        ))
+    })?;
+
+    // Validate: index is in range for the target canvas
     let obj_count = entries
         .iter()
-        .filter(|e| e.depth == internal_depth && e.object_index.is_some())
+        .filter(|e| e.canvas_id == Some(canvas_id) && e.object_index.is_some())
         .count();
 
     if index > obj_count {
         return Err(PdtkError::Usage(format!(
-            "index {index} out of range for depth {depth} (object count: {obj_count})"
+            "index {index} out of range for depth {depth}, canvas {canvas} (object count: {obj_count})"
         )));
     }
 
@@ -38,37 +48,16 @@ pub fn run(
         kind: classify_entry(entry),
         depth: internal_depth,
         object_index: Some(index),
-        canvas_id: None,
+        canvas_id: Some(canvas_id),
     };
 
-    // Find insertion position: before the first entry at this depth with
-    // object_index >= index.  If inserting at the end, place after all objects
-    // at this depth (but before connections at this depth).
-    let insert_pos = if index < obj_count {
-        // Insert before the existing object at this index
-        entries
-            .iter()
-            .position(|e| {
-                e.depth == internal_depth && e.object_index.is_some_and(|idx| idx >= index)
-            })
-            .unwrap_or(entries.len())
-    } else {
-        // Appending: find the last object at this depth and insert after it.
-        // We want to be after all objects but before connections at this depth.
-        let last_obj = entries
-            .iter()
-            .rposition(|e| e.depth == internal_depth && e.object_index.is_some());
-        match last_obj {
-            Some(pos) => pos + 1,
-            None => entries.len(),
-        }
-    };
+    let insert_pos = object_insert_pos(&entries, canvas_id, index);
 
     entries.insert(insert_pos, new_entry);
 
-    // Renumber connections at this depth: src/dst >= original index get +1
+    // Renumber connections in this canvas: src/dst >= original index get +1
     for e in &mut entries {
-        if e.kind != EntryKind::Connect || e.depth != internal_depth {
+        if e.kind != EntryKind::Connect || e.canvas_id != Some(canvas_id) {
             continue;
         }
 

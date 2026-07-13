@@ -3,6 +3,20 @@ mod integration;
 use integration::{handcrafted, pdtk_output, run_pdtk, stdout_string};
 
 #[test]
+fn list_shows_array_as_indexed_object() {
+    // `#X array` is a gobj in Pd, so it appears in the object listing with
+    // its own index, shifting the objects that follow it.
+    let f = handcrafted("array_in_canvas.pd");
+    let out = pdtk_output(&["list", f.to_str().unwrap()]);
+    assert!(
+        out.contains("[0:0]"),
+        "array should be index 0; got:\n{out}"
+    );
+    assert!(out.contains("[0:1] metro 100"), "got:\n{out}");
+    assert!(out.contains("[0:2] tabwrite"), "got:\n{out}");
+}
+
+#[test]
 fn list_simple_chain_shows_3_objects() {
     let f = handcrafted("simple_chain.pd");
     let out = run_pdtk(&["list", f.to_str().unwrap()]);

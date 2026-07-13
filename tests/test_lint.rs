@@ -20,6 +20,35 @@ fn lint_invalid_connection_exits_1() {
 }
 
 #[test]
+fn lint_checks_connection_ranges_per_sibling_canvas() {
+    // sub_a's dst 2 is invalid because sub_a only has objects 0 and 1. sub_b
+    // also lives at depth 1 and has object 2; depth-merged validation would
+    // incorrectly make the sub_a connection appear in-range.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #N canvas 0 22 200 200 sub_a 0;\n\
+                 #X obj 20 20 inlet;\n\
+                 #X obj 20 60 outlet;\n\
+                 #X connect 0 0 2 0;\n\
+                 #X restore 50 50 pd sub_a;\n\
+                 #N canvas 0 22 200 200 sub_b 0;\n\
+                 #X obj 20 20 inlet;\n\
+                 #X obj 20 60 f;\n\
+                 #X obj 20 100 outlet;\n\
+                 #X restore 120 50 pd sub_b;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["lint", tmp.path().to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "lint must reject invalid connections per canvas, stdout:\n{}",
+        stdout_string(&out)
+    );
+    assert!(stdout_string(&out).contains("out of range"));
+}
+
+#[test]
 fn lint_detects_overlapping_objects() {
     // Craft a patch where two objects share the same x/y
     let input = "#N canvas 0 22 450 300 12;\n\

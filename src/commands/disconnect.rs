@@ -11,6 +11,8 @@ pub struct RunArgs<'a> {
     pub file: &'a str,
     /// User-visible depth (0 = top-level).
     pub depth: usize,
+    /// Nth sibling canvas at this depth (0 = first).
+    pub canvas: usize,
     /// Source object index.
     pub src: usize,
     /// Source outlet index.
@@ -31,6 +33,7 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
     let RunArgs {
         file,
         depth,
+        canvas,
         src,
         outlet,
         dst,
@@ -43,19 +46,26 @@ pub fn run(args: RunArgs<'_>) -> Result<(String, i32), PdtkError> {
     let input = io::read_patch_file(file)?;
     let mut patch = parse(&input)?;
 
-    let internal_depth = depth + 1;
+    let canvas_id = patch.resolve_canvas(depth, canvas).ok_or_else(|| {
+        PdtkError::Usage(format!(
+            "no canvas {canvas} at depth {depth} ({} at this depth)",
+            patch.canvas_ids_at_depth(depth).len()
+        ))
+    })?;
     let target_raw = format!("#X connect {src} {outlet} {dst} {inlet};");
 
-    // Find the connection to remove
+    // Find the connection to remove (scoped to the selected canvas)
     let pos = patch
         .entries
         .iter()
         .position(|e| {
-            e.kind == EntryKind::Connect && e.depth == internal_depth && e.raw.trim() == target_raw
+            e.kind == EntryKind::Connect
+                && e.canvas_id == Some(canvas_id)
+                && e.raw.trim() == target_raw
         })
         .ok_or_else(|| {
             PdtkError::Usage(format!(
-                "connection {src} {outlet} {dst} {inlet} not found at depth {depth}"
+                "connection {src} {outlet} {dst} {inlet} not found at depth {depth}, canvas {canvas}"
             ))
         })?;
 

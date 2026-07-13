@@ -1,4 +1,5 @@
 use crate::errors::PdtkError;
+use crate::types::signatures::{inlet_count, outlet_count};
 use pdtk::{
     model::{Connection, EntryKind},
     parser::{
@@ -57,16 +58,19 @@ pub fn run(
         ));
     }
 
-    // 2) Object counts per internal depth
-    let mut object_counts: HashMap<usize, usize> = HashMap::new();
+    // 2) Object counts per canvas (sibling subpatches at the same depth have
+    //    independent index spaces, so counts must be per canvas, not per depth).
+    let mut counts_by_canvas: HashMap<usize, usize> = HashMap::new();
     for e in &patch.entries {
-        if e.object_index.is_some() {
-            *object_counts.entry(e.depth).or_insert(0) += 1;
+        if e.object_index.is_some()
+            && let Some(cid) = e.canvas_id
+        {
+            *counts_by_canvas.entry(cid).or_insert(0) += 1;
         }
     }
 
-    // 3) Connection range checks
-    let mut seen_by_depth: HashMap<usize, HashSet<(usize, usize, usize, usize)>> = HashMap::new();
+    // 3) Connection range checks + outlet/inlet arity checks (canvas-scoped)
+    let mut seen_by_canvas: HashMap<usize, HashSet<(usize, usize, usize, usize)>> = HashMap::new();
     for (i, entry) in patch.entries.iter().enumerate() {
         if entry.kind != EntryKind::Connect {
             continue;
@@ -77,7 +81,8 @@ pub fn run(
             continue;
         };
 
-        let count = object_counts.get(&entry.depth).copied().unwrap_or(0);
+        let cid = entry.canvas_id.unwrap_or(usize::MAX);
+        let count = counts_by_canvas.get(&cid).copied().unwrap_or(0);
         let user_depth = entry.depth.saturating_sub(1);
 
         if conn.src >= count {
@@ -85,18 +90,44 @@ pub fn run(
                 "depth {user_depth}: connect src {} out of range (object count {count})",
                 conn.src
             ));
+        } else if let Some(src_obj) = patch.object_in_canvas(cid, conn.src) {
+            // Outlet arity: Pd silently drops a wire from a nonexistent outlet.
+            let class = src_obj.class();
+            let args = src_obj.args();
+            let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            if let Some(n) = outlet_count(class, &args_refs)
+                && conn.src_outlet >= n
+            {
+                warnings.push(format!(
+                    "depth {user_depth}: '{class}' has {n} outlet(s) but connection uses outlet {}",
+                    conn.src_outlet
+                ));
+            }
         }
+
         if conn.dst >= count {
             errors.push(format!(
                 "depth {user_depth}: connect dst {} out of range (object count {count})",
                 conn.dst
             ));
+        } else if let Some(dst_obj) = patch.object_in_canvas(cid, conn.dst) {
+            let class = dst_obj.class();
+            let args = dst_obj.args();
+            let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            if let Some(n) = inlet_count(class, &args_refs)
+                && conn.dst_inlet >= n
+            {
+                warnings.push(format!(
+                    "depth {user_depth}: '{class}' has {n} inlet(s) but connection uses inlet {}",
+                    conn.dst_inlet
+                ));
+            }
         }
 
         // --strict: duplicate connections → warnings (not errors)
         if strict {
             let key = (conn.src, conn.src_outlet, conn.dst, conn.dst_inlet);
-            let seen = seen_by_depth.entry(entry.depth).or_default();
+            let seen = seen_by_canvas.entry(cid).or_default();
             if !seen.insert(key) {
                 warnings.push(format!(
                     "depth {user_depth}: duplicate connection {} {} {} {}",
@@ -133,6 +164,9 @@ pub fn run(
             ));
         }
     }
+
+    // 5) Detached `#A` array data (data bound to the wrong array or dropped).
+    warnings.extend(crate::commands::common::detached_array_data(&patch));
 
     let valid = errors.is_empty();
     let exit_code = i32::from(!valid);

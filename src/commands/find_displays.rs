@@ -14,6 +14,10 @@ struct DisplayRow {
     index: usize,
     text: String,
     connected: bool,
+    /// Canvas the object belongs to — the deletion scope. Sibling subpatches
+    /// at the same depth have independent index spaces.
+    #[serde(skip)]
+    canvas_id: usize,
 }
 
 fn is_display(entry: &pdtk::model::Entry, include_labels: bool) -> bool {
@@ -80,8 +84,11 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
                 continue;
             }
 
+            let Some(cid) = e.canvas_id else { continue };
+            // Connectivity is per canvas: a same-index connection in a
+            // sibling subpatch must not make this object look connected.
             let connected = patch
-                .connections_at_depth(user_depth)
+                .connections_in_canvas(cid)
                 .iter()
                 .any(|c| c.src == idx || c.dst == idx);
             if connected || include_unconnected {
@@ -91,6 +98,7 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
                     index: idx,
                     text: e.raw.clone(),
                     connected,
+                    canvas_id: cid,
                 });
             }
         }
@@ -109,7 +117,7 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
             per_file
                 .entry(r.file.clone())
                 .or_default()
-                .push((r.depth, r.index));
+                .push((r.canvas_id, r.index));
         }
 
         for (file, mut dels) in per_file {
@@ -117,9 +125,10 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
             let tok = tokenize_entries(&input);
             let mut entries = build_entries(&tok.entries);
 
+            // delete highest canvas/index first to avoid index drift
             dels.sort_by(|a, b| b.cmp(a));
-            for (d, i) in dels {
-                let _ = delete_object(&mut entries, d, i);
+            for (cid, i) in dels {
+                let _ = delete_object(&mut entries, cid, i);
             }
 
             let patch = pdtk::model::Patch {

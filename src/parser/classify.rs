@@ -37,6 +37,7 @@ pub fn classify_entry(raw: &str) -> EntryKind {
         "connect" => EntryKind::Connect,
         "coords" => EntryKind::Coords,
         "array" => EntryKind::Array,
+        "scalar" => EntryKind::Scalar,
         "declare" => EntryKind::Declare,
         "f" => {
             // Standalone width hint: #X f <number>;

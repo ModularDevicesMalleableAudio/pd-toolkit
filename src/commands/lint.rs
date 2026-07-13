@@ -37,8 +37,10 @@ pub fn run(
     let patch = parse(&input)?;
 
     let mut errors: Vec<String> = Vec::new();
-    let warnings: Vec<String> = patch.warnings.iter().map(|w| format!("{w:?}")).collect();
+    let mut warnings: Vec<String> = patch.warnings.iter().map(|w| format!("{w:?}")).collect();
     let mut style: Vec<String> = Vec::new();
+
+    warnings.extend(crate::commands::common::detached_array_data(&patch));
 
     // --- Structural validation (same as validate command) ---
 
@@ -62,11 +64,15 @@ pub fn run(
         ));
     }
 
-    let mut object_counts: std::collections::HashMap<usize, usize> =
+    // Connection ranges are per canvas: sibling subpatches at the same depth
+    // have independent index spaces.
+    let mut counts_by_canvas: std::collections::HashMap<usize, usize> =
         std::collections::HashMap::default();
     for e in &patch.entries {
-        if e.object_index.is_some() {
-            *object_counts.entry(e.depth).or_insert(0) += 1;
+        if e.object_index.is_some()
+            && let Some(cid) = e.canvas_id
+        {
+            *counts_by_canvas.entry(cid).or_insert(0) += 1;
         }
     }
 
@@ -78,7 +84,8 @@ pub fn run(
             errors.push(format!("malformed connect: {}", e.raw.trim()));
             continue;
         };
-        let count = object_counts.get(&e.depth).copied().unwrap_or(0);
+        let cid = e.canvas_id.unwrap_or(usize::MAX);
+        let count = counts_by_canvas.get(&cid).copied().unwrap_or(0);
         let ud = e.depth.saturating_sub(1);
         if conn.src >= count {
             errors.push(format!("depth {ud}: src {} out of range", conn.src));

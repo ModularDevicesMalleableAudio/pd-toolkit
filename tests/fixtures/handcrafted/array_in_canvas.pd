@@ -1,0 +1,5 @@
+#N canvas 0 22 450 300 12;
+#X array data_arr 100 float 3;
+#X obj 50 50 metro 100;
+#X obj 50 100 tabwrite data_arr;
+#X connect 1 0 2 0;

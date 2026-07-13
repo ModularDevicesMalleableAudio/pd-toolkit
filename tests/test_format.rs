@@ -9,6 +9,59 @@ fn connections_from(text: &str) -> Vec<String> {
         .collect()
 }
 
+#[test]
+fn format_leaves_comments_in_place() {
+    // `#X text` comments are not part of the signal/control graph; format must
+    // never reposition them (doing so scatters annotations off-canvas).
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X text 250 60 important annotation;\n\
+                 #X obj 50 60 loadbang;\n\
+                 #X obj 50 100 metro 500;\n\
+                 #X obj 50 140 print;\n\
+                 #X connect 1 0 2 0;\n\
+                 #X connect 2 0 3 0;\n";
+    let tmp = tempfile::Builder::new().suffix(".pd").tempfile().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let out = pdtk_output(&["format", tmp.path().to_str().unwrap(), "--dry-run"]);
+    assert!(
+        out.contains("#X text 250 60 important annotation;"),
+        "comment must keep its coordinates; got:\n{out}"
+    );
+}
+
+#[test]
+fn format_leaves_graph_restore_in_place() {
+    // A graph-on-parent `#X restore ... graph;` positions the visible graph;
+    // format must not move it.
+    let f = handcrafted("with_graph.pd");
+    let out = pdtk_output(&["format", f.to_str().unwrap(), "--dry-run"]);
+    assert!(
+        out.contains("#X restore 50 100 graph;"),
+        "graph restore must keep its coordinates; got:\n{out}"
+    );
+}
+
+#[test]
+fn format_still_repositions_regular_objects() {
+    // Sanity: excluding comments must not disable layout for real objects.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X text 250 60 note;\n\
+                 #X obj 5 5 loadbang;\n\
+                 #X obj 200 200 print;\n\
+                 #X connect 1 0 2 0;\n";
+    let tmp = tempfile::Builder::new().suffix(".pd").tempfile().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let out = pdtk_output(&["format", tmp.path().to_str().unwrap(), "--dry-run"]);
+    // loadbang/print get laid out (not left at their original scattered coords),
+    // while the comment and the single connection are preserved.
+    assert!(out.contains("#X text 250 60 note;"), "got:\n{out}");
+    assert!(out.contains("#X connect 1 0 2 0;"), "got:\n{out}");
+    assert!(
+        !out.contains("#X obj 200 200 print;"),
+        "print should be repositioned; got:\n{out}"
+    );
+}
+
 // Critical test
 #[test]
 fn format_connections_byte_identical_before_after() {

@@ -91,9 +91,15 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
         // Coordinate assignment
         let coords = place_nodes(&ordered, &widths, &opts);
 
-        // Rewrite only X/Y in the object entries — nothing else changes
+        // Rewrite only X/Y in the object entries — nothing else changes.
+        // Comments (`#X text`) and graph-on-parent (`#X restore ... graph;`)
+        // boxes are never repositioned: they carry no connections and moving
+        // them scatters annotations / relocates the visible graph.
         for e in &mut patch.entries {
             if e.depth != internal {
+                continue;
+            }
+            if !is_layoutable(e) {
                 continue;
             }
             let Some(idx) = e.object_index else { continue };
@@ -124,6 +130,18 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
         ));
     }
 
+    // Safety check: comment and graph-restore lines must be byte-identical.
+    let orig_protected: Vec<&str> = input.lines().filter(|l| is_protected_line(l)).collect();
+    let new_protected: Vec<&str> = serialized
+        .lines()
+        .filter(|l| is_protected_line(l))
+        .collect();
+    if orig_protected != new_protected {
+        return Err(PdtkError::Usage(
+            "BUG: format modified a comment or graph box — refusing to write".to_string(),
+        ));
+    }
+
     if dry_run {
         return Ok(serialized);
     }
@@ -135,6 +153,38 @@ pub fn run(args: RunArgs<'_>) -> Result<String, PdtkError> {
     }
 
     Ok(serialized)
+}
+
+/// Whether an entry participates in automatic layout (gets repositioned).
+/// Comments, graph-on-parent restore boxes, arrays, scalars, and non-object
+/// entries are excluded so their coordinates are preserved.
+fn is_layoutable(entry: &Entry) -> bool {
+    match entry.kind {
+        EntryKind::Obj
+        | EntryKind::Msg
+        | EntryKind::FloatAtom
+        | EntryKind::SymbolAtom
+        | EntryKind::ListAtom => true,
+        // A `pd` subpatch restore is an ordinary connectable object; a graph
+        // restore positions the visible graph and must not move.
+        EntryKind::Restore => restore_name(&entry.raw) != Some("graph"),
+        _ => false,
+    }
+}
+
+/// The name token of a `#X restore X Y <name> ...;` entry (token index 4).
+fn restore_name(raw: &str) -> Option<&str> {
+    raw.trim_end()
+        .trim_end_matches(';')
+        .split_whitespace()
+        .nth(4)
+}
+
+/// Lines that format guarantees to leave byte-identical: `#X text` comments
+/// and graph-on-parent `#X restore ... graph;` boxes.
+fn is_protected_line(line: &str) -> bool {
+    let t = line.trim_start();
+    t.starts_with("#X text ") || (t.starts_with("#X restore ") && restore_name(t) == Some("graph"))
 }
 
 /// Rewrite the X and Y coordinate fields (tokens 2 and 3) of an object entry.

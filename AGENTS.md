@@ -124,6 +124,17 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 | `#X floatatom` | `#X floatatom 50 50 5 0 0 0 - - -;` | ✅ YES |
 | `#X symbolatom` | `#X symbolatom 50 50 10 0 0 0 - - -;` | ✅ YES |
 | `#X restore` | `#X restore 50 50 pd name;` | ✅ YES (at parent depth) |
+| `#X array` | `#X array name 100 float 3;` | ✅ YES (garray gobj; Pd `graph_array` → `glist_add`) |
+| `#X scalar` | `#X scalar template 1 2 3;` | ✅ YES (scalar gobj; Pd `glist_scalar` → `glist_add`) |
+
+> **`#X array`/`#X scalar` occupy a connect index.** In Pd's file loader both
+> are added to the current canvas's `gl_list`, so they consume an object index
+> exactly like an `#X obj`. Skipping them shifts every following connection
+> index in that canvas. (This reverses the earlier "array is not an object"
+> convention — verified against `src/g_array.c` and `src/g_canvas.c` in the Pd
+> source.) In practice arrays usually sit alone in a graph subcanvas with no
+> connections, which is why the bug stayed hidden; it still corrupts any
+> canvas that mixes an array/scalar with connected objects.
 
 ### What does NOT count as an object
 
@@ -132,7 +143,6 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 | `#N canvas` | `#N canvas 0 22 450 300 12;` | Canvas header |
 | `#X connect` | `#X connect 0 0 1 0;` | Connection reference |
 | `#X coords` | `#X coords 0 7 16 0 200 140 1 0 0;` | Graph config |
-| `#X array` | `#X array name 100 float 3;` | Array definition |
 | `#X declare` | `#X declare -path pos_abs;` | Standalone directive |
 | `#X f` | `#X f 115;` | Width hint for preceding object |
 | `#A` | `#A 0 0 0 0;` | Array data |
@@ -149,6 +159,41 @@ PD writes connections **after** all objects at the same depth. Within a subpatch
 2. Objects (`#X obj`, `#X msg`, etc.)
 3. Connections (`#X connect`)
 4. `#X restore` (closes subpatch — becomes object at parent depth)
+
+### Canvas-scoped addressing (sibling subpatches)
+
+Object indices and connections are **per canvas**, not per depth. In Pd,
+`canvas_connect` resolves indices by walking the *current* canvas's `gl_list`,
+and every `#N canvas` resets the index counter. Two sibling `pd` subpatches at
+the same depth therefore each start at object index 0 — depth alone does not
+identify an object.
+
+The parser records a per-entry `canvas_id`. Edit commands select a sibling with
+`--canvas N` (the Nth canvas at that depth in document order; default 0 = first
+sibling = legacy behaviour). Use the canvas-scoped `Patch` helpers
+(`resolve_canvas`, `object_in_canvas`, `object_count_in_canvas`,
+`connections_in_canvas`, plus the free `resolve_canvas_id` /
+`canvas_ids_at_depth` for raw entry slices) rather than the depth-only
+`object_at` / `connections_at_depth`, which merge siblings and are kept only for
+legacy callers. `validate` counts objects per `canvas_id` for the same reason.
+
+### Subpatch header forms
+
+A `#N canvas` header has two shapes (see Pd `canvas_new`):
+- **Root / abstraction:** `#N canvas X Y W H FONT;` (5 args after `canvas`)
+- **Subpatch (subwindow):** `#N canvas X Y W H NAME VIS;` (6 args: name + vis flag)
+
+When emitting a new subpatch inside a patch (the `subpatch` command) use the
+6-arg subwindow form and close it with `#X restore X Y pd NAME;`. `extract`
+emits the 5-arg form because the extracted file is a *root* canvas.
+
+### External resolution (`deps`)
+
+Pd resolves an unknown object class by trying, per search directory:
+compiled externals (`.pd_linux`/`.l_amd64`/`.so`/`.pd_darwin`/`.dll`/…),
+loader externals (`.pd_lua`, `.pd_luax`), then abstractions (`.pd`, `.pat`,
+and the `name/name.pd` class-in-folder convention). `deps` mirrors this set;
+checking only `.pd` reports Lua/compiled externals as false `MISSING`.
 
 ## Code Style
 
@@ -181,8 +226,9 @@ PD writes connections **after** all objects at the same depth. Within a subpatch
 
 ### Adding a new pdtk command
 
-1. Implement the command in the Rust crate
-2. Add integration tests in `tests/integration/test_<command>.rs`
+1. Implement the command in the Rust crate (`src/commands/<command>.rs`, register in
+   `src/commands/mod.rs`, add the subcommand to `src/cli.rs`, dispatch in `src/main.rs`)
+2. Add integration tests in `tests/test_<command>.rs` (they share `mod integration;`)
 3. Create any new fixtures needed
 4. Add integration tests to the shell harness (`test_pdtk_integration` function)
 5. Run full checks: `cargo fmt && cargo clippy && cargo test && ./tests/run_tests.sh`
@@ -222,10 +268,12 @@ git diff tests/fixtures/
 
 1. **Don't count `#X declare` as an object** — it looks like one but standalone declares are invisible to connections
 2. **Don't count `#X f N` as an object** — it's a width hint that follows `#X restore`
-3. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content
-4. **`#X restore` changes depth BEFORE getting an index** — pop depth first, then assign index at new depth.
+3. **DO count `#X array` and `#X scalar` as objects** — they are `gobj`s in Pd and take a connect index; not counting them mis-indexes connections in a canvas that mixes an array/scalar with wired objects
+4. **Sibling subpatches don't share an index space** — objects inside two same-depth `pd` subpatches both start at index 0; use `--canvas N` (and the canvas-scoped `Patch` helpers) to disambiguate
+5. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content
+6. **`#X restore` changes depth BEFORE getting an index** — pop depth first, then assign index at new depth.
    Example: depth-0 has `obj_A` (idx 0), `obj_B` (idx 1), then a subpatch opens. Inside at depth-1: `obj_C` (idx 0), `obj_D` (idx 1). The `#X restore` pops depth 1→0 and receives idx **2** at depth 0. Wrong: assigning it idx 2 at depth 1 corrupts every parent-level connection.
-5. **Multi-line entries** — continuation lines don't start with `#`. Only lines starting with `#` begin new entries.
-6. **`, f N` at end of an entry** — this is an inline width hint, NOT part of the object class or arguments
-7. **`f` as an object class** — `#X obj 50 50 f;` is a float box. Don't confuse with width hints.
+7. **Multi-line entries** — continuation lines don't start with `#`. Only lines starting with `#` begin new entries.
+8. **`, f N` at end of an entry** — this is an inline width hint, NOT part of the object class or arguments
+9. **`f` as an object class** — `#X obj 50 50 f;` is a float box. Don't confuse with width hints.
 
