@@ -646,6 +646,14 @@ fi
 test_fixture_coverage
 test_pdtk_integration
 
+if [ -f "$SCRIPT_DIR/check_bump_version.sh" ]; then
+    if bash "$SCRIPT_DIR/check_bump_version.sh" >/dev/null; then
+        pass "bump-version.sh unit tests"
+    else
+        fail "bump-version.sh unit tests" "run tests/check_bump_version.sh directly for details"
+    fi
+fi
+
 # Summary
 echo ""
 echo -e "${BLUE}━━━ Summary ━━━${NC}"

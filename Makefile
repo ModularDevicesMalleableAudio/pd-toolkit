@@ -17,13 +17,18 @@ build:
 release:
 	cargo build --release
 
-# Run all tests with nextest (faster output, parallel)
+# Run all tests with nextest (faster output, parallel), plus doctests
+# (nextest doesn't run them) and the shell harness — the same three steps
+# CI's `test` job runs, so a pass here predicts a CI pass.
 test:
 	cargo nextest run
+	cargo test --doc
+	./tests/run_tests.sh
 
-# Lint: clippy (pedantic configured in Cargo.toml), formatting, docs, dep audit
+# Lint: clippy (pedantic configured in Cargo.toml, promoted to errors here to
+# match CI), formatting, docs, dep audit
 lint:
-	cargo clippy
+	cargo clippy -- -D warnings
 	cargo fmt --check
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --quiet
 	cargo deny check

@@ -231,7 +231,7 @@ checking only `.pd` reports Lua/compiled externals as false `MISSING`.
 2. Add integration tests in `tests/test_<command>.rs` (they share `mod integration;`)
 3. Create any new fixtures needed
 4. Add integration tests to the shell harness (`test_pdtk_integration` function)
-5. Run full checks: `cargo fmt && cargo clippy && cargo test && ./tests/run_tests.sh`
+5. Run full checks: `make lint && make test` (see [Checking your work](#checking-your-work))
 
 ### Modifying the parser
 
@@ -246,11 +246,9 @@ checking only `.pd` reports Lua/compiled externals as false `MISSING`.
 Before committing any change:
 
 ```sh
-# Shell tests must pass
-./tests/run_tests.sh
-
-# If Rust code exists
-cd pd-toolkit && cargo fmt && cargo clippy && cargo test && cargo doc
+# Lint + full test suite (nextest, doctests, shell harness) — same checks CI runs
+make lint
+make test
 
 # Verify no fixture was accidentally modified
 git diff tests/fixtures/

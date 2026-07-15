@@ -1,0 +1,260 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  # Reuse the exact same gate CI runs on every PR, so a release can never
+  # ship through a weaker set of checks than the code was merged under.
+  validate:
+    name: Validate before release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/validate.yml
+
+  # Determine bump type, apply it, and push back to main.
+  version-bump:
+    name: Bump version
+    needs: validate
+    permissions:
+      contents: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    # GitHub also suppresses [skip ci] pushes at the workflow level, but
+    # this guard handles any edge case where the workflow fires anyway.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    outputs:
+      should_release: ${{ steps.bump-type.outputs.should_release }}
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          # Check out the current main tip, not the triggering commit. If
+          # another merge landed while this release sat in the `release-main`
+          # concurrency queue, we bump on top of it (fast-forward push) and
+          # batch both merges into one release, instead of committing on a
+          # stale base and failing `git push --atomic` with a non-fast-forward.
+          ref: main
+          # fetch-depth: 0 brings full history *and* tags (needed by
+          # bump-version.sh to detect already-released versions).
+          fetch-depth: 0
+          # Push the bump commit to a protected main with a token allowed to
+          # bypass branch protection. Set RELEASE_TOKEN (a PAT or GitHub App
+          # token whose actor can bypass "require a pull request" / required
+          # status checks on main); it falls back to GITHUB_TOKEN where main is
+          # unprotected. A PAT push won't loop: the bump commit carries [skip ci].
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # Read the labels on the PR that was just merged.
+      # Add label  release:minor  or  release:major  before merging to override
+      # the default patch bump.
+      - name: Determine bump type from PR labels
+        id: bump-type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
+          PR_NUMBER=$(echo "$PRS" | jq -r '.[0].number // empty')
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No associated merged PR found for $GITHUB_SHA — skipping release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "bump=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LABELS=$(echo "$PRS" | jq -r '.[0].labels[].name')
+          echo "Merged PR: #$PR_NUMBER"
+          echo "Labels on merged PR: ${LABELS:-none}"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          if echo "$LABELS" | grep -qx "release:major"; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -qx "release:minor"; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        if: steps.bump-type.outputs.should_release == 'true'
+        with:
+          toolchain: stable
+
+      # cargo-set-version updates both Cargo.toml and Cargo.lock atomically
+      # (internally runs `cargo update -p pdtk --precise <new>`)
+      - uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853
+        if: steps.bump-type.outputs.should_release == 'true'
+        with:
+          tool: cargo-edit
+
+      # The version-arithmetic / idempotency decision (bump vs. release-as-is)
+      # lives in .github/scripts/bump-version.sh, which has its own unit tests
+      # (tests/check_bump_version.sh, run by tests/run_tests.sh) — see that
+      # script for the exact rules. This step only carries out the resulting
+      # git effects, in one step so the decision and the push share shell state.
+      - name: Version, tag, and release
+        if: steps.bump-type.outputs.should_release == 'true'
+        id: release
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          read -r ACTION NEW EXISTING_SHA < <(.github/scripts/bump-version.sh Cargo.toml "${{ steps.bump-type.outputs.bump }}")
+
+          if [ "$ACTION" = "bump" ]; then
+            # Cargo.toml's version is already released: bump it, commit, and tag.
+            echo "Bumping to v$NEW (${{ steps.bump-type.outputs.bump }})"
+            cargo set-version "$NEW"
+            git add Cargo.toml Cargo.lock
+            git commit -m "chore: release v$NEW [skip ci]"
+            git tag "v$NEW"
+            # One atomic push of branch + tag: either both refs advance or
+            # neither does, so a failure can't leave main bumped without its
+            # tag. The `release-main` concurrency group serialises release runs
+            # so this push can't race another release.
+            git push --atomic origin main "v$NEW"
+            SHA=$(git rev-parse HEAD)
+          elif [ "$ACTION" = "release" ]; then
+            # The merged PR already bumped Cargo.toml to an unreleased version.
+            # Release it as-is: no bump commit, so nothing is pushed to main
+            # (only the tag) and the version is never double-bumped.
+            echo "Cargo.toml already at unreleased v$NEW — tagging without a bump commit"
+            git tag "v$NEW"
+            git push origin "v$NEW"
+            # Tag points at the checked-out main tip; build/release from the
+            # same commit rather than the (possibly older) triggering SHA.
+            SHA=$(git rev-parse HEAD)
+          else
+            # Rerun after the tag was already created: continue from that tag's
+            # target commit instead of trying to recreate it.
+            echo "v$NEW already exists at $EXISTING_SHA — reusing existing tag"
+            SHA="$EXISTING_SHA"
+          fi
+
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+  # Build cross-platform binaries from the version-bump commit.
+  build:
+    name: Build ${{ matrix.target }}
+    needs: version-bump
+    if: needs.version-bump.outputs.should_release == 'true'
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            use_cross: true
+          - target: aarch64-unknown-linux-musl   # Raspberry Pi 4 deploy target
+            os: ubuntu-latest
+            use_cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            use_cross: false
+          - target: aarch64-apple-darwin
+            os: macos-14
+            use_cross: false
+    steps:
+      # Check out the version-bump commit, not the original merge SHA
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ needs.version-bump.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --locked
+
+      - name: Build (cross)
+        if: matrix.use_cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build (native)
+        if: "!matrix.use_cross"
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Stage binary
+        id: package
+        run: |
+          VERSION="${{ needs.version-bump.outputs.version }}"
+          ASSET="pdtk-v${VERSION}-${{ matrix.target }}"
+          cp "target/${{ matrix.target }}/release/pdtk" "$ASSET"
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.package.outputs.asset }}
+          path: ${{ steps.package.outputs.asset }}
+          retention-days: 1
+
+  # Create the GitHub release and publish to crates.io.
+  release:
+    name: Create release
+    needs: [version-bump, build]
+    if: needs.version-bump.outputs.should_release == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ needs.version-bump.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+
+      - name: Download built binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: ${{ runner.temp }}/dist/
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: v${{ needs.version-bump.outputs.version }}
+          name: v${{ needs.version-bump.outputs.version }}
+          generate_release_notes: true
+          files: ${{ runner.temp }}/dist/*
+
+      # Requires CARGO_REGISTRY_TOKEN in repo secrets.
+      # Settings → Secrets → New secret → CARGO_REGISTRY_TOKEN
+      # Token from crates.io → Account Settings → API Tokens (scope: publish-update).
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          VERSION: ${{ needs.version-bump.outputs.version }}
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "CARGO_REGISTRY_TOKEN not set — skipping crates.io publish"
+            exit 0
+          fi
+          # Idempotent: if this version is already on crates.io (a retried
+          # release, or a manual publish) skip instead of hard-failing.
+          if curl -sf "https://crates.io/api/v1/crates/pdtk/${VERSION}" >/dev/null; then
+            echo "pdtk ${VERSION} already published — skipping"
+            exit 0
+          fi
+          cargo publish --token "$CARGO_REGISTRY_TOKEN"

@@ -1,0 +1,16 @@
+name: CI
+
+# Runs the shared quality gate on every PR. Pushes to main are validated by
+# the Release workflow's `validate` job (release.yml), which reuses the exact
+# same reusable workflow — so main is still gated, but the merge commit is
+# validated once (in Release) instead of twice (here and in Release).
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml

@@ -1,0 +1,47 @@
+name: Validate
+
+# Single source of truth for the quality gate. Called by ci.yml on every
+# PR/push and by release.yml before it cuts a release, so both paths run
+# the exact same checks and cannot drift apart.
+#
+# The check *commands* live in the Makefile (`make test` / `make lint`); these
+# jobs only install the tools those targets assume and then delegate, so the
+# gate is defined in exactly one place and a local `make` pass predicts a CI
+# pass by construction rather than by a comment promising they match.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+      # `make test` runs `cargo nextest run`; install the only tool it assumes.
+      - uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853
+        with:
+          tool: nextest
+      - run: make test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+      # `make lint` runs `cargo deny check`; install the only tool it assumes.
+      - uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853
+        with:
+          tool: cargo-deny
+      - run: make lint

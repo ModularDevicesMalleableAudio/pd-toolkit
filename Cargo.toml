@@ -13,11 +13,11 @@ authors = ["Modular Devices Malleable Audio <modular.devices.malleable.audio@gma
 keywords = ["pure-data", "puredata", "pd", "patch", "audio"]
 categories = ["command-line-utilities", "multimedia::audio", "parser-implementations"]
 
-# Keep the published tarball lean: drop prebuilt binaries, design docs,
-# and developer-only assets that crate users do not need.
+# Keep the published tarball lean: drop design docs and developer-only
+# assets that crate users do not need. (Prebuilt binaries are no longer
+# committed — they ship as GitHub release assets.)
 exclude = [
     ".tools/",
-    "pdtk-x86_64-linux",
     "docs/",
     "skills/",
     "AGENTS.md",
