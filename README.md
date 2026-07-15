@@ -287,8 +287,22 @@ cargo install pdtk
 
 ### Prebuilt binary
 
-An x86_64 Linux binary, `pdtk-x86_64-linux`, is included in the repository
-root for users without a Rust toolchain. Copy it onto your `PATH` and run.
+Each [GitHub release](https://github.com/ModularDevicesMalleableAudio/pd-toolkit/releases)
+publishes prebuilt binaries for users without a Rust toolchain, named
+`pdtk-v<version>-<target-triple>`:
+
+- `x86_64-unknown-linux-musl` (fully static)
+- `aarch64-unknown-linux-musl` (Raspberry Pi 4; fully static)
+- `x86_64-apple-darwin`
+- `aarch64-apple-darwin`
+
+The Linux `musl` builds are fully static; the macOS builds link against the
+system libraries as usual. Download the asset matching your platform, put it
+on your `PATH`, and run.
+This naming scheme is a stable public contract — anything that downloads a
+release automatically (e.g. an install script in another repo) can rely on
+it; changing `matrix.target` or the asset name in `.github/workflows/release.yml`
+is a breaking change for those consumers.
 
 ### Build from source
 
@@ -344,3 +358,31 @@ scp target/aarch64-unknown-linux-musl/release/pdtk pi:~/bin/
 ```
 
 See `Makefile` for `make cross-pi`, `make deploy`, and other targets.
+
+---
+
+## Releasing
+
+Releases are fully automated by `.github/workflows/release.yml` on every push
+to `main` (i.e. every merged PR):
+
+1. `.github/workflows/validate.yml` (the same gate `ci.yml` runs on every PR)
+   must pass.
+2. The version is bumped according to a label on the merged PR — add
+   `release:minor` or `release:major` before merging to override the default
+   **patch** bump. The bump/tag decision itself lives in
+   `.github/scripts/bump-version.sh` (unit-tested by
+   `tests/check_bump_version.sh`, run as part of `./tests/run_tests.sh`).
+3. Cross-platform binaries are built (see asset list under
+   [Prebuilt binary](#prebuilt-binary)) and attached to a new GitHub release,
+   and the crate is published to crates.io.
+
+No local publish step is needed or supported — do not run `cargo publish`
+by hand.
+
+### Required repository secrets
+
+| Secret | Purpose | Falls back to |
+|---|---|---|
+| `RELEASE_TOKEN` | Push the version-bump commit/tag to a protected `main` | `GITHUB_TOKEN` (only works if `main` has no required checks blocking `GITHUB_TOKEN` pushes) |
+| `CARGO_REGISTRY_TOKEN` | Publish to crates.io | none — the publish step is skipped with a log message if unset |
