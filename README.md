@@ -293,12 +293,12 @@ publishes prebuilt binaries for users without a Rust toolchain, named
 
 - `x86_64-unknown-linux-musl` (fully static)
 - `aarch64-unknown-linux-musl` (Raspberry Pi 4; fully static)
-- `x86_64-apple-darwin`
 - `aarch64-apple-darwin`
 
-The Linux `musl` builds are fully static; the macOS builds link against the
-system libraries as usual. Download the asset matching your platform, put it
-on your `PATH`, and run.
+The Linux `musl` builds are fully static; the Apple Silicon macOS build links
+against the system libraries as usual. Intel Mac users should install with
+`cargo install pdtk`. Download the asset matching your platform, put it on your
+`PATH`, and run.
 This naming scheme is a stable public contract — anything that downloads a
 release automatically (e.g. an install script in another repo) can rely on
 it; changing `matrix.target` or the asset name in `.github/workflows/release.yml`

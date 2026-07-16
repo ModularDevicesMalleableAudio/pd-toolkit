@@ -114,7 +114,7 @@ jobs:
             echo "Bumping to v$NEW (${{ steps.bump-type.outputs.bump }})"
             cargo set-version "$NEW"
             git add Cargo.toml Cargo.lock
-            git commit -m "chore: release v$NEW [skip ci]"
+            git commit -m "Bump version to $NEW [skip ci]"
             git tag "v$NEW"
             # One atomic push of branch + tag: either both refs advance or
             # neither does, so a failure can't leave main bumped without its
@@ -160,9 +160,6 @@ jobs:
           - target: aarch64-unknown-linux-musl   # Raspberry Pi 4 deploy target
             os: ubuntu-latest
             use_cross: true
-          - target: x86_64-apple-darwin
-            os: macos-13
-            use_cross: false
           - target: aarch64-apple-darwin
             os: macos-14
             use_cross: false
