@@ -148,7 +148,10 @@ pdtk deps src/ --recursive --buses --json | jq '.unsatisfied'
 ```
 
 reports buses that an abstraction expects but no caller provides (or
-vice versa).
+vice versa). Abstraction bus names containing `$1`..`$9` are realized against
+each call site's arguments (`[looper voice3]` realizes `[r $1-clock]` to
+`voice3-clock`) before matching the caller's sends/receives; `$0-` names stay
+instance-scoped and are not matched cross-file.
 
 ---
 

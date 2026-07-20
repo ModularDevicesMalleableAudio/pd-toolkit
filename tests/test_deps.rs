@@ -694,8 +694,11 @@ fn deps_recursive_buses_reports_unsatisfied() {
 
 #[test]
 fn deps_recursive_buses_dollar_names_excluded() {
-    // contract_inner.pd has [r $0-internal] and [s $1-arg_bus]. Both
-    // must be excluded from cross-file contracts.
+    // contract_inner.pd has [r \$0-internal] and [s \$1-arg_bus]. $0 is
+    // instance-scoped and always excluded; $1 is realized against call-site
+    // args, but this caller supplies NO args, so $1 is unrealizable and also
+    // does not appear. (Feature F adds realization; see the tests below for
+    // the with-argument behaviour.)
     let caller = tempfile::NamedTempFile::new().unwrap();
     let dir_arg = abs_dir();
     std::fs::write(
@@ -722,6 +725,100 @@ fn deps_recursive_buses_dollar_names_excluded() {
     assert!(
         !section.contains("$1-arg_bus") && !section.contains("\\$1-arg_bus"),
         "$1 name leaked into cross-file contract: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_realizes_dollar_arg_in_contract() {
+    // Feature F: contract_inner.pd has [s \$1-arg_bus]. Instantiated as
+    // `contract_inner voice`, $1 -> voice, so the abstraction sends on
+    // `voice-arg_bus` and the caller (lacking a matching receiver) must be
+    // told it needs a receiver for the REALIZED name.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n#X obj 50 50 contract_inner voice;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        section.contains("voice-arg_bus") && section.contains("needs_receiver"),
+        "realized $1 bus name must appear: {out}"
+    );
+    // The unrealized literal must NOT leak.
+    assert!(
+        !section.contains("$1-arg_bus") && !section.contains("\\$1-arg_bus"),
+        "unrealized $1 literal leaked: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_realized_dollar_arg_satisfied_by_caller() {
+    // Feature F: when the caller provides the realized receiver
+    // (`[r voice-arg_bus]`), the $1-derived contract is satisfied and must
+    // NOT be reported.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n\
+         #X obj 50 20 r voice-arg_bus;\n\
+         #X obj 50 60 contract_inner voice;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        !section.contains("voice-arg_bus"),
+        "realized bus satisfied by caller must not be reported: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_message_box_send_satisfies_contract() {
+    // Feature A + F synergy: the caller drives the abstraction's [r control_bus]
+    // from a MESSAGE BOX (`\; control_bus 1`), which counts as a sender, so
+    // the contract is satisfied and not reported as needs_sender.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n\
+         #X msg 50 20 \\; control_bus 1;\n\
+         #X obj 50 60 contract_inner;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        !section.contains("control_bus"),
+        "message-box send must satisfy the [r control_bus] contract: {out}"
     );
 }
 
