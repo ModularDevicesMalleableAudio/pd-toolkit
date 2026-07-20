@@ -363,3 +363,19 @@ fn validate_no_inlet_warning_for_bare_send_right_inlet() {
         "bare [send]/[s] right-inlet wiring is valid; got:\n{s}"
     );
 }
+
+// Feature E: a stray unescaped ';' in a message body splits the entry and
+// leaves a bare fragment. validate flags the fragment (warning, not error).
+
+#[test]
+fn validate_flags_stray_fragment_from_unescaped_semicolon() {
+    let input = "#N canvas 0 22 450 300 12;\n#X msg 10 10 foo ; bar;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "stray fragment is a warning");
+    let s = stdout_string(&out);
+    assert!(s.contains("stray content"), "got:\n{s}");
+    assert!(s.contains("unescaped ';'"), "got:\n{s}");
+}

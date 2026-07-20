@@ -122,6 +122,52 @@ fn escaped_semicolon_in_message() {
     );
 }
 
+// Feature E: entries terminate at each unescaped `;` (PD binbuf_text parity),
+// not only at end-of-line.
+
+#[test]
+fn two_entries_on_one_line_are_split() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 10 10 loadbang; #X obj 10 40 print;\n";
+    let patch = parse(input).unwrap();
+    // loadbang and print must be two separate indexed objects.
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "print");
+}
+
+#[test]
+fn connections_packed_on_one_line_are_split() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 10 10 loadbang;\n\
+                 #X obj 10 40 t b b;\n\
+                 #X obj 10 70 print;\n\
+                 #X connect 0 0 1 0;#X connect 1 0 2 0;#X connect 1 1 2 0;\n";
+    let patch = parse(input).unwrap();
+    let conns = patch.connections_at_depth(0);
+    assert_eq!(conns.len(), 3, "three connections packed on one line");
+    assert!(conns.iter().any(|c| c.src == 0 && c.dst == 1));
+    assert!(
+        conns
+            .iter()
+            .any(|c| c.src == 1 && c.src_outlet == 1 && c.dst == 2)
+    );
+}
+
+#[test]
+fn escaped_semicolon_before_real_terminator_stays_one_entry() {
+    // The `\;` send-target separator must not split; only the final `;` ends
+    // the message. Verified end-to-end through parse().
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 19 89 \\; target read foo.mseq;\n\
+                 #X obj 19 120 print;\n";
+    let patch = parse(input).unwrap();
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    let msg = patch.object_at(0, 0).unwrap();
+    assert_eq!(msg.kind, EntryKind::Msg);
+    assert!(msg.raw.contains("\\; target"));
+}
+
 #[test]
 fn float_object_not_confused_with_width_hint() {
     let patch = parse_fixture("float_vs_width.pd");

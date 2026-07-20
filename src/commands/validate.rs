@@ -2,10 +2,7 @@ use crate::errors::PdtkError;
 use crate::types::signatures::{inlet_count, outlet_count};
 use pdtk::{
     model::{Connection, EntryKind},
-    parser::{
-        escape::{has_unescaped_dollar_digit, has_unescaped_semicolon_in_body},
-        parse,
-    },
+    parser::{escape::has_unescaped_dollar_digit, parse},
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -156,11 +153,19 @@ pub fn run(
                 entry.raw
             ));
         }
+    }
 
-        if has_unescaped_semicolon_in_body(&entry.raw) {
+    // 4b) Stray fragments from an accidental unescaped ';' in a message or
+    //     comment body. PD (and pdtk's tokenizer) terminate an entry at each
+    //     unescaped ';', so a mid-body ';' splits the entry and leaves a bare
+    //     fragment that does not begin with a '#' sigil. Real Pd patches never
+    //     contain bare entries (inline scalar data is a single '\;'-escaped
+    //     entry; classic array data is '#A'), so any bare fragment is a stray.
+    for (i, entry) in patch.entries.iter().enumerate() {
+        if entry.kind == EntryKind::Unknown && !entry.raw.trim_start().starts_with('#') {
             warnings.push(format!(
-                "entry {i}: unescaped ';' found inside entry body (use \\;): {}",
-                entry.raw
+                "entry {i}: stray content (likely an unescaped ';' in a preceding message body — use \\;): {}",
+                entry.raw.trim()
             ));
         }
     }

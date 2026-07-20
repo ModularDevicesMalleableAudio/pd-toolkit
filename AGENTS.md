@@ -268,10 +268,10 @@ git diff tests/fixtures/
 2. **Don't count `#X f N` as an object** — it's a width hint that follows `#X restore`
 3. **DO count `#X array` and `#X scalar` as objects** — they are `gobj`s in Pd and take a connect index; not counting them mis-indexes connections in a canvas that mixes an array/scalar with wired objects
 4. **Sibling subpatches don't share an index space** — objects inside two same-depth `pd` subpatches both start at index 0; use `--canvas N` (and the canvas-scoped `Patch` helpers) to disambiguate
-5. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content
+5. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content. But an *unescaped* `;` terminates an entry **anywhere**, not only at end-of-line: the tokenizer splits on every unescaped `;` (matching Pd's `binbuf_text`), so `a; b;` on one physical line is two entries. A stray unescaped `;` in a message body therefore produces a bare fragment entry (flagged by `validate`).
 6. **`#X restore` changes depth BEFORE getting an index** — pop depth first, then assign index at new depth.
    Example: depth-0 has `obj_A` (idx 0), `obj_B` (idx 1), then a subpatch opens. Inside at depth-1: `obj_C` (idx 0), `obj_D` (idx 1). The `#X restore` pops depth 1→0 and receives idx **2** at depth 0. Wrong: assigning it idx 2 at depth 1 corrupts every parent-level connection.
-7. **Multi-line entries** — continuation lines don't start with `#`. Only lines starting with `#` begin new entries.
+7. **Multi-line entries** — a single entry may span physical lines; continuation lines are joined until an unescaped `;` terminator is reached (Pd inserts no column wrapping, only a newline after each real `;`).
 8. **`, f N` at end of an entry** — this is an inline width hint, NOT part of the object class or arguments
 9. **`f` as an object class** — `#X obj 50 50 f;` is a float box. Don't confuse with width hints.
 
