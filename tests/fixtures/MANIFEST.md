@@ -22,6 +22,9 @@ Object indices are annotated in comments where relevant.
 | `dollar_signs.pd` | `\$1`, `\$2` args | 4 | 2 | Abstraction arguments |
 | `with_declare.pd` | Standalone `#X declare` | 10 | 6 | Declare NOT an object |
 | `with_width_hint.pd` | `#X f 38;` after restore | 2 | 1 | Width hint NOT an object |
+| `struct_before_canvas.pd` | Leading `#N struct` before root canvas | 3 | 1 | Template def precedes `#N canvas` (must parse); struct not indexed; scalar is object |
+| `multi_struct_before_canvas.pd` | Two `#N struct` before root canvas | 2 | 1 | Multiple leading templates (array-field template) |
+| `struct_after_canvas.pd` | `#N struct` inside root canvas | 2 | 1 | Template after canvas header; struct not indexed |
 | `with_graph.pd` | Graph-on-parent | 4 | 2 | Graph subpatch + arrays |
 | `graph_and_pd_subpatches.pd` | Both subpatch types | 4 | 2 | Mixed graph + pd restore |
 | `float_vs_width.pd` | `f` class vs `, f N` | 5 | 5 | Disambiguation |

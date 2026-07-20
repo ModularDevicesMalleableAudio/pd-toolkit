@@ -21,6 +21,7 @@ pub mod rename_send;
 pub mod renumber;
 pub mod search;
 pub mod stats;
+pub mod structs;
 pub mod subpatch;
 pub mod trace;
 pub mod validate;

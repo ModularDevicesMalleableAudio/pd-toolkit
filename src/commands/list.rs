@@ -21,7 +21,7 @@ pub fn run(
     json: bool,
     output: Option<&str>,
 ) -> Result<String, PdtkError> {
-    let input = std::fs::read_to_string(file)?;
+    let input = crate::io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
     let mut rows: Vec<ListObject> = patch

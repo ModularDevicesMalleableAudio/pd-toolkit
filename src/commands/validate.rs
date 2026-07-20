@@ -1,15 +1,33 @@
 use crate::errors::PdtkError;
 use crate::types::signatures::{inlet_count, outlet_count};
 use pdtk::{
-    model::{Connection, EntryKind},
-    parser::{
-        escape::{has_unescaped_dollar_digit, has_unescaped_semicolon_in_body},
-        parse,
-    },
+    model::{Connection, EntryKind, parse_scalar, parse_struct},
+    parser::{escape::has_unescaped_dollar_digit, parse},
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
+use std::path::Path;
+
+/// Memoized `(inlets, outlets)` for an object class resolved as an abstraction
+/// relative to the patch being validated. `None` means "not resolvable as an
+/// introspectable `.pd` abstraction" (unknown external, missing file, etc.) —
+/// in which case no arity check is applied, matching the conservative
+/// never-undercount policy of the builtin signature table.
+fn abstraction_io_cached(
+    cache: &mut HashMap<String, Option<(usize, usize)>>,
+    class: &str,
+    file_path: &Path,
+    content: &str,
+) -> Option<(usize, usize)> {
+    if let Some(cached) = cache.get(class) {
+        return *cached;
+    }
+    let resolved = pdtk::analysis::deps::resolve_abstraction(class, file_path, content)
+        .and_then(|p| pdtk::analysis::deps::abstraction_io_counts(&p));
+    cache.insert(class.to_string(), resolved);
+    resolved
+}
 
 #[derive(Debug)]
 pub struct ValidateResult {
@@ -30,7 +48,7 @@ pub fn run(
     json: bool,
     output: Option<&str>,
 ) -> Result<ValidateResult, PdtkError> {
-    let input = std::fs::read_to_string(file)?;
+    let input = crate::io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
     let mut errors: Vec<String> = Vec::new();
@@ -71,6 +89,9 @@ pub fn run(
 
     // 3) Connection range checks + outlet/inlet arity checks (canvas-scoped)
     let mut seen_by_canvas: HashMap<usize, HashSet<(usize, usize, usize, usize)>> = HashMap::new();
+    // Cache of arity counts for classes resolved as project-local abstractions.
+    let file_path = Path::new(file);
+    let mut abs_io: HashMap<String, Option<(usize, usize)>> = HashMap::new();
     for (i, entry) in patch.entries.iter().enumerate() {
         if entry.kind != EntryKind::Connect {
             continue;
@@ -95,11 +116,20 @@ pub fn run(
             let class = src_obj.class();
             let args = src_obj.args();
             let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            if let Some(n) = outlet_count(class, &args_refs)
-                && conn.src_outlet >= n
+            if let Some(n) = outlet_count(class, &args_refs) {
+                if conn.src_outlet >= n {
+                    warnings.push(format!(
+                        "depth {user_depth}: '{class}' has {n} outlet(s) but connection uses outlet {}",
+                        conn.src_outlet
+                    ));
+                }
+            } else if class != "pd"
+                && let Some((_, outs)) =
+                    abstraction_io_cached(&mut abs_io, class, file_path, &input)
+                && conn.src_outlet >= outs
             {
                 warnings.push(format!(
-                    "depth {user_depth}: '{class}' has {n} outlet(s) but connection uses outlet {}",
+                    "depth {user_depth}: abstraction '{class}' has {outs} outlet(s) but connection uses outlet {}",
                     conn.src_outlet
                 ));
             }
@@ -114,11 +144,20 @@ pub fn run(
             let class = dst_obj.class();
             let args = dst_obj.args();
             let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            if let Some(n) = inlet_count(class, &args_refs)
-                && conn.dst_inlet >= n
+            if let Some(n) = inlet_count(class, &args_refs) {
+                if conn.dst_inlet >= n {
+                    warnings.push(format!(
+                        "depth {user_depth}: '{class}' has {n} inlet(s) but connection uses inlet {}",
+                        conn.dst_inlet
+                    ));
+                }
+            } else if class != "pd"
+                && let Some((ins, _)) =
+                    abstraction_io_cached(&mut abs_io, class, file_path, &input)
+                && conn.dst_inlet >= ins
             {
                 warnings.push(format!(
-                    "depth {user_depth}: '{class}' has {n} inlet(s) but connection uses inlet {}",
+                    "depth {user_depth}: abstraction '{class}' has {ins} inlet(s) but connection uses inlet {}",
                     conn.dst_inlet
                 ));
             }
@@ -156,12 +195,56 @@ pub fn run(
                 entry.raw
             ));
         }
+    }
 
-        if has_unescaped_semicolon_in_body(&entry.raw) {
+    // 4b) Stray fragments from an accidental unescaped ';' in a message or
+    //     comment body. PD (and pdtk's tokenizer) terminate an entry at each
+    //     unescaped ';', so a mid-body ';' splits the entry and leaves a bare
+    //     fragment that does not begin with a '#' sigil. Real Pd patches never
+    //     contain bare entries (inline scalar data is a single '\;'-escaped
+    //     entry; classic array data is '#A'), so any bare fragment is a stray.
+    for (i, entry) in patch.entries.iter().enumerate() {
+        if entry.kind == EntryKind::Unknown && !entry.raw.trim_start().starts_with('#') {
             warnings.push(format!(
-                "entry {i}: unescaped ';' found inside entry body (use \\;): {}",
-                entry.raw
+                "entry {i}: stray content (likely an unescaped ';' in a preceding message body — use \\;): {}",
+                entry.raw.trim()
             ));
+        }
+    }
+
+    // 4c) Data-structure consistency (warnings, mirroring Pd's load-time
+    //     diagnostics): a `#X scalar` must reference a defined `#N struct`,
+    //     and supply exactly as many flat values as the template has scalar
+    //     (float/symbol) fields. Templates are patch-global in Pd, so collect
+    //     them across all depths.
+    let mut templates: HashMap<String, usize> = HashMap::new();
+    for e in &patch.entries {
+        if e.kind == EntryKind::Struct
+            && let Some(t) = parse_struct(&e.raw)
+        {
+            templates.insert(t.name.clone(), t.scalar_field_count());
+        }
+    }
+    for e in &patch.entries {
+        if e.kind != EntryKind::Scalar {
+            continue;
+        }
+        let Some((tmpl, flat)) = parse_scalar(&e.raw) else {
+            continue;
+        };
+        let user_depth = e.depth.saturating_sub(1);
+        match templates.get(&tmpl) {
+            // A `$`-scoped template name is realized per-instance; static
+            // matching is unreliable, so don't claim it is undefined.
+            None if !tmpl.contains('$') => warnings.push(format!(
+                "depth {user_depth}: scalar references undefined template '{tmpl}' (no matching #N struct)"
+            )),
+            Some(&nfields) if flat.len() != nfields => warnings.push(format!(
+                "depth {user_depth}: scalar '{tmpl}' has {} value(s) but template defines {} scalar field(s)",
+                flat.len(),
+                nfields
+            )),
+            _ => {}
         }
     }
 

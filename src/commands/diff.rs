@@ -10,8 +10,8 @@ pub fn run(
     json: bool,
     ignore_coords: bool,
 ) -> Result<String, PdtkError> {
-    let input_a = io::read_patch_file(file_a)?;
-    let input_b = io::read_patch_file(file_b)?;
+    let input_a = io::read_patch_lenient(file_a)?;
+    let input_b = io::read_patch_lenient(file_b)?;
     let patch_a = parse(&input_a)?;
     let patch_b = parse(&input_b)?;
 

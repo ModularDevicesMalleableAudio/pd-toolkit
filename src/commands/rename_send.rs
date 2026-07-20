@@ -1,6 +1,8 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pdtk::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
+use pdtk::model::{
+    Entry, EntryKind, gui_send_receive_arg_indices, message_send_targets, vu_receive_arg_index,
+};
 use pdtk::parser::escape::escape_pd_dollars;
 use pdtk::parser::{build_entries, tokenize_entries};
 use pdtk::rewrite::serialize;
@@ -125,6 +127,24 @@ pub fn rename_in_entry(raw: &str, kind: &EntryKind, from: &str, to: &str) -> Opt
             after_recv.or(after_send)
         }
 
+        EntryKind::Msg => {
+            // Message boxes send to named receivers via `\;`-introduced
+            // sub-messages (`\; foo 1`). Renaming a receive without also
+            // rewriting these targets silently breaks the patch, so rewrite
+            // each matching target token in place. Token count is unchanged by
+            // a replacement, so positions collected up-front stay valid.
+            let targets = message_send_targets(raw);
+            let mut result = raw.to_string();
+            let mut changed = false;
+            for (pos, _name) in targets {
+                if let Some(next) = replace_raw_token(&result, pos, from, to) {
+                    result = next;
+                    changed = true;
+                }
+            }
+            if changed { Some(result) } else { None }
+        }
+
         _ => None,
     }
 }
@@ -173,6 +193,14 @@ fn collect_sr_names(entries: &[Entry]) -> std::collections::HashSet<String> {
                             names.insert(n.to_string());
                         }
                     }
+                }
+            }
+            EntryKind::Msg => {
+                // Named send targets embedded in message boxes are also SR
+                // names, so the `--to already exists` safety check must see
+                // them.
+                for (_pos, name) in message_send_targets(&e.raw) {
+                    names.insert(name);
                 }
             }
             _ => {}

@@ -42,6 +42,42 @@
       }
     ]
   },
+  "handcrafted/struct_before_canvas.pd": {
+    "_note": "D0: #N struct template precedes the root #N canvas; struct is not an object; scalar IS an object (gobj).",
+    "entry_count": 6,
+    "depth_0_objects": 3,
+    "depth_0_connections": 1,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "objects_at_0": [
+      { "index": 0, "class": "loadbang" },
+      { "index": 1, "class": "scalar" },
+      { "index": 2, "class": "print" }
+    ],
+    "connections_at_0": [
+      { "src": 0, "outlet": 0, "dst": 2, "inlet": 0 }
+    ]
+  },
+  "handcrafted/multi_struct_before_canvas.pd": {
+    "_note": "D0: two #N struct templates precede the root #N canvas.",
+    "entry_count": 6,
+    "depth_0_objects": 2,
+    "depth_0_connections": 1,
+    "max_depth": 0,
+    "canvas_count": 1,
+    "objects_at_0": [
+      { "index": 0, "class": "loadbang" },
+      { "index": 1, "class": "print" }
+    ]
+  },
+  "handcrafted/struct_after_canvas.pd": {
+    "_note": "D0 regression: #N struct inside the root canvas; not an object.",
+    "entry_count": 5,
+    "depth_0_objects": 2,
+    "depth_0_connections": 1,
+    "max_depth": 0,
+    "canvas_count": 1
+  },
   "handcrafted/branching.pd": {
     "depth_0_objects": 5,
     "depth_0_connections": 4,

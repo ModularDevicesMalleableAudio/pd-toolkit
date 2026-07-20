@@ -27,14 +27,14 @@ proptest! {
         let mut applied_known: Vec<&'static str> = Vec::new();
         for k in &knowns {
             for t in k.tokens() {
-                tokens.push(t.to_string());
+                tokens.push(t.clone());
             }
             applied_known.push(k.name());
         }
         let unknown_start = tokens.len();
         for u in &unknowns {
             for t in u.tokens() {
-                tokens.push(t.to_string());
+                tokens.push(t.clone());
             }
         }
         // Disallow generated names that look like a flag — that would be
@@ -59,7 +59,7 @@ proptest! {
 
         // (1) name and size always correct.
         prop_assert_eq!(r["name"].as_str().unwrap(), &name);
-        prop_assert_eq!(r["size"].as_u64().unwrap(), size as u64);
+        prop_assert_eq!(r["size"].as_u64().unwrap(), u64::from(size));
 
         let d = &r["define"];
         let has_unknown = !unknowns.is_empty();

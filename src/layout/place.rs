@@ -200,7 +200,7 @@ mod tests {
 
     fn make_obj(class_args: &str) -> Entry {
         Entry {
-            raw: format!("#X obj 50 50 {};", class_args),
+            raw: format!("#X obj 50 50 {class_args};"),
             kind: EntryKind::Obj,
             depth: 1,
             object_index: Some(0),
@@ -210,7 +210,7 @@ mod tests {
 
     fn make_floatatom(width_chars: i32) -> Entry {
         Entry {
-            raw: format!("#X floatatom 50 50 {} 0 0 0 - - -;", width_chars),
+            raw: format!("#X floatatom 50 50 {width_chars} 0 0 0 - - -;"),
             kind: EntryKind::FloatAtom,
             depth: 1,
             object_index: Some(0),

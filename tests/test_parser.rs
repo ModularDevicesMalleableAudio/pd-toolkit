@@ -122,6 +122,52 @@ fn escaped_semicolon_in_message() {
     );
 }
 
+// Feature E: entries terminate at each unescaped `;` (PD binbuf_text parity),
+// not only at end-of-line.
+
+#[test]
+fn two_entries_on_one_line_are_split() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 10 10 loadbang; #X obj 10 40 print;\n";
+    let patch = parse(input).unwrap();
+    // loadbang and print must be two separate indexed objects.
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "print");
+}
+
+#[test]
+fn connections_packed_on_one_line_are_split() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 10 10 loadbang;\n\
+                 #X obj 10 40 t b b;\n\
+                 #X obj 10 70 print;\n\
+                 #X connect 0 0 1 0;#X connect 1 0 2 0;#X connect 1 1 2 0;\n";
+    let patch = parse(input).unwrap();
+    let conns = patch.connections_at_depth(0);
+    assert_eq!(conns.len(), 3, "three connections packed on one line");
+    assert!(conns.iter().any(|c| c.src == 0 && c.dst == 1));
+    assert!(
+        conns
+            .iter()
+            .any(|c| c.src == 1 && c.src_outlet == 1 && c.dst == 2)
+    );
+}
+
+#[test]
+fn escaped_semicolon_before_real_terminator_stays_one_entry() {
+    // The `\;` send-target separator must not split; only the final `;` ends
+    // the message. Verified end-to-end through parse().
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 19 89 \\; target read foo.mseq;\n\
+                 #X obj 19 120 print;\n";
+    let patch = parse(input).unwrap();
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    let msg = patch.object_at(0, 0).unwrap();
+    assert_eq!(msg.kind, EntryKind::Msg);
+    assert!(msg.raw.contains("\\; target"));
+}
+
 #[test]
 fn float_object_not_confused_with_width_hint() {
     let patch = parse_fixture("float_vs_width.pd");
@@ -277,6 +323,82 @@ fn parse_missing_canvas_header_returns_error() {
     assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
 }
 
+// D0: data-structure patches may begin with one or more `#N struct` template
+// definitions before the root `#N canvas` (as real Pd saves them). These must
+// parse, with the struct(s) recognised but not indexed.
+
+#[test]
+fn struct_before_canvas_parses() {
+    let patch = parse_fixture("struct_before_canvas.pd");
+    // loadbang(0), scalar(1), print(2) — the leading struct is not an object.
+    assert_eq!(patch.object_count_at_depth(0), 3);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "scalar");
+    assert_eq!(patch.object_at(0, 2).unwrap().class(), "print");
+    let conns = patch.connections_at_depth(0);
+    assert!(conns.iter().any(|c| c.src == 0 && c.dst == 2));
+
+    // The leading struct is recognised and carries no object index.
+    let st = patch
+        .entries
+        .iter()
+        .find(|e| e.raw.starts_with("#N struct"))
+        .expect("struct entry present");
+    assert_eq!(st.kind, EntryKind::Struct);
+    assert_eq!(st.object_index, None);
+}
+
+#[test]
+fn multi_struct_before_canvas_parses() {
+    let patch = parse_fixture("multi_struct_before_canvas.pd");
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "print");
+    assert!(
+        patch
+            .connections_at_depth(0)
+            .iter()
+            .any(|c| c.src == 0 && c.dst == 1)
+    );
+    // Both leading structs are recognised, neither indexed.
+    let structs: Vec<_> = patch
+        .entries
+        .iter()
+        .filter(|e| e.kind == EntryKind::Struct)
+        .collect();
+    assert_eq!(structs.len(), 2);
+    assert!(structs.iter().all(|e| e.object_index.is_none()));
+}
+
+#[test]
+fn struct_after_canvas_still_parses() {
+    // Regression: a `#N struct` inside the root canvas (the layout that
+    // already parsed) must keep working and remain a non-indexed Struct.
+    let patch = parse_fixture("struct_after_canvas.pd");
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    let st = patch
+        .entries
+        .iter()
+        .find(|e| e.kind == EntryKind::Struct)
+        .expect("struct entry present");
+    assert_eq!(st.object_index, None);
+}
+
+#[test]
+fn parse_struct_without_any_canvas_errors() {
+    // Reject garbage: a file with templates but no root canvas is invalid.
+    let result = parse("#N struct point float x float y;\n");
+    assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
+}
+
+#[test]
+fn parse_nonstruct_before_canvas_errors() {
+    // Only `#N struct` may precede the root canvas; a stray object before it
+    // is still rejected.
+    let result = parse("#X obj 10 10 print;\n#N canvas 0 22 450 300 12;\n");
+    assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
+}
+
 #[test]
 fn parse_multiline_msg_single_entry() {
     let patch = parse_fixture("multiline_obj.pd");
@@ -407,6 +529,18 @@ fn roundtrip_minimal() {
 }
 
 #[test]
+fn serialize_normalizes_missing_trailing_newline() {
+    // Pd's writer always emits a final newline; an input missing one is
+    // normalized to include exactly one — the single intentional exception to
+    // byte-exact round-tripping (toward Pd-canonical form). See rewrite::serialize.
+    let input = "#N canvas 0 22 450 300 12;\n#X obj 20 50 dac~;"; // no trailing \n
+    let out = serialize(&parse(input).unwrap());
+    assert_eq!(out, format!("{input}\n"));
+    // And the normalized form then round-trips exactly (idempotent).
+    assert_eq!(serialize(&parse(&out).unwrap()), out);
+}
+
+#[test]
 fn roundtrip_simple_chain() {
     assert_roundtrip("simple_chain.pd", handcrafted("simple_chain.pd"));
 }
@@ -454,7 +588,7 @@ fn roundtrip_all_handcrafted_fixtures() {
     let dir = helpers::fixtures_dir().join("handcrafted");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             // empty_file.pd is intentionally invalid — skip round-trip
             if name == "empty_file.pd" {
@@ -470,7 +604,7 @@ fn roundtrip_all_corpus_files() {
     let dir = helpers::fixtures_dir().join("corpus");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             assert_roundtrip(&name, path);
         }
@@ -484,7 +618,7 @@ fn parse_all_corpus_files_no_error() {
     let dir = helpers::fixtures_dir().join("corpus");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             let input = read_fixture(&path);
             parse(&input).unwrap_or_else(|e| panic!("parse failed for {name}: {e}"));

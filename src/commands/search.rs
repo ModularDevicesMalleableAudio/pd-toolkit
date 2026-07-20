@@ -53,7 +53,7 @@ pub fn run(
     let mut rows = Vec::new();
 
     for file in files {
-        let Ok(input) = std::fs::read_to_string(&file) else {
+        let Ok(input) = crate::io::read_patch_lenient(&file) else {
             continue;
         };
         let Ok(patch) = parse(&input) else { continue };

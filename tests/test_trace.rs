@@ -70,7 +70,7 @@ fn trace_json_output_schema() {
     assert!(v.get("mode").is_some());
     assert!(v.get("from").is_some());
     assert!(v.get("hops").is_some());
-    assert!(v["hops"].as_array().unwrap().len() >= 1);
+    assert!(!v["hops"].as_array().unwrap().is_empty());
 }
 
 #[test]

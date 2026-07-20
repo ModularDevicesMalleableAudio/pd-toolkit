@@ -21,7 +21,7 @@ fn pd_else_all_fixtures_parse_without_error() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pd_else");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -35,7 +35,7 @@ fn pd_else_all_fixtures_validate_cleanly() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pd_else");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -54,7 +54,7 @@ fn pd_else_all_fixtures_round_trip_byte_identical() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pd_else");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();

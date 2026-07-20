@@ -1,3 +1,8 @@
+// Shared test-support module included by every integration test via
+// `mod integration;`. Each test binary uses only a subset of these helpers,
+// so unused ones are expected per-binary.
+#![allow(dead_code)]
+
 use assert_cmd::Command;
 use std::path::{Path, PathBuf};
 

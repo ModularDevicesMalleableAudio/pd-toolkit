@@ -14,7 +14,7 @@ pub fn run(
     json: bool,
     show_bus_hops: bool,
 ) -> Result<String, PdtkError> {
-    let input = io::read_patch_file(file)?;
+    let input = io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
     let filter = if show_bus_hops {
         EdgeFilter::All

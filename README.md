@@ -75,17 +75,18 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 |---|---|---|
 | **Inspection** | `parse` | Object count, connection count, depth, warnings |
 | | `list` | List every indexed object with address and class |
-| | `validate` | Check connection index ranges and canvas balance. `--strict` also warns on duplicate connections |
+| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects), and on data-structure inconsistencies (a `#X scalar` with no matching `#N struct`, or a scalar/template field-count mismatch). `--strict` also warns on duplicate connections |
 | | `lint` | Validate + layout overlap detection. Opt-in heuristics: `--send-receive`, `--fan-out`, `--dsp-loop` (see [Lint checks](#lint-checks)) |
 | | `stats` | Per-file metrics: fan-in/out, class histogram, orphans. Aggregates across all files in directory mode |
 | | `connections` | List all patch cords to/from one object |
 | | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, duplicate detection. `--kind classic\|define\|all`, `--templates include\|exclude\|only`, `--schema 1\|2` |
+| | `structs` | List data-structure templates (`#N struct`) with typed fields and scalars (`#X scalar`) with template + value count. Flags scalars whose template is undefined. File or directory, `--json` |
 | **Search** | `search` | Find objects by class (`--type`) and/or text (`--text`, glob by default, `--regex` for regex). `--case-sensitive`, `--depth` |
 | | `find-orphans` | Objects with zero connections. `--delete --in-place` removes them; `--include-comments` includes `#X text` |
 | | `find-displays` | Connected debug display widgets (floatatom/symbolatom/nbx/vu). `--include-unconnected`, `--include-labels`, `--delete` |
 | | `trace` | BFS forward trace or path-find. `--show-bus-hops` also follows matching `s`/`r`, `s~`/`r~`, `throw~`/`catch~` pairs within each canvas, respecting the three bus namespaces (see [Send/receive buses](#sendreceive-buses)) |
 | | `diff` | Structural diff (objects added/removed/modified, cords). `--ignore-coords` is the pairing for `format` diffs |
-| | `deps` | Abstraction dependency list. `--missing`, `--recursive`, `--search-path DIR` (repeatable fallback), `--pd-path` (append common external locations), `--buses` (bus pairs by namespace; with `--recursive` reports unsatisfied cross-file contracts), `--per-file` (don't merge bus names across files) |
+| | `deps` | Abstraction dependency list. A class covered by a declared library (`#X declare -lib`/`-stdlib`, or ELSE `[import]`) is reported `unresolved (declared lib: …)` instead of `MISSING` and excluded from `--missing`. `--missing`, `--recursive`, `--search-path DIR` (repeatable fallback), `--pd-path` (append common external locations), `--buses` (bus pairs by namespace; with `--recursive` reports unsatisfied cross-file contracts), `--per-file` (don't merge bus names across files) |
 | **Creation** | `new` | Create a blank `.pd` patch. Defaults match PD's `File > New`: 450×300, font 12, y=22 (macOS) / y=50 (Linux) |
 | **Editing** | `insert` | Insert object, renumber connections automatically |
 | | `delete` | Delete an object (`--index`) or an entire subpatch (`--subpatch`); cords are removed and remaining ones renumbered |
@@ -93,7 +94,7 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 | | `connect` | Add a patch cord (refuses duplicates and out-of-range) |
 | | `disconnect` | Remove a specific patch cord |
 | | `renumber` | Manually shift connection indices by a delta |
-| | `rename-send` | Rename s/r pairs atomically across files, including GUI fields. `--dry-run`, `--force` (override target-exists check) |
+| | `rename-send` | Rename s/r pairs atomically across files, including GUI fields and named send targets inside message boxes (`\; name ...`). `--dry-run`, `--force` (override target-exists check) |
 | **Layout** | `format` | Auto-reposition objects (connections byte-identical). `--grid`, `--hpad`, `--margin`, `--depth`, `--dry-run` |
 | **Subpatch** | `extract` | Extract subpatch into standalone abstraction. Inlet/outlet count inferred from connections crossing the boundary |
 | **Utilities** | `batch` | Apply any command recursively across `.pd` files. `--glob`, `--continue-on-error`, `--dry-run` |
@@ -111,14 +112,19 @@ command also has a man page (see [Man pages](#man-pages)).
 pdtk models PD's three disjoint bus namespaces — they share names but never
 route to each other at runtime:
 
-| Namespace   | Senders                          | Receivers              |
-|-------------|----------------------------------|------------------------|
-| `control`   | `s` / `send` + GUI send fields   | `r` / `receive`        |
-| `signal`    | `s~` / `send~`                   | `r~` / `receive~`      |
-| `audio_sum` | `throw~` (sums into one `catch~`)| `catch~`               |
+| Namespace   | Senders                                      | Receivers              |
+|-------------|----------------------------------------------|------------------------|
+| `control`   | `s` / `send`, GUI send fields, message-box `\; name` targets | `r` / `receive`        |
+| `signal`    | `s~` / `send~`                               | `r~` / `receive~`      |
+| `audio_sum` | `throw~` (sums into one `catch~`)            | `catch~`               |
 
 `trace --show-bus-hops` and `deps --buses` follow bus connections respecting
 this split. A `[s foo]` and `[s~ foo]` are never reported as connected.
+
+Message boxes drive named receivers via PD's `\;`-send idiom
+(`#X msg ... \; pitch 60;` sends `60` to `[r pitch]`). These count as control
+senders in bus analysis and are rewritten by `rename-send`. Engine/canvas
+targets (`pd`, `pd-<name>`) are excluded to avoid false orphans.
 
 ```
 $ pdtk trace patch.pd --from 0 --show-bus-hops
@@ -143,7 +149,10 @@ pdtk deps src/ --recursive --buses --json | jq '.unsatisfied'
 ```
 
 reports buses that an abstraction expects but no caller provides (or
-vice versa).
+vice versa). Abstraction bus names containing `$1`..`$9` are realized against
+each call site's arguments (`[looper voice3]` realizes `[r $1-clock]` to
+`voice3-clock`) before matching the caller's sends/receives; `$0-` names stay
+instance-scoped and are not matched cross-file.
 
 ---
 

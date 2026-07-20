@@ -32,6 +32,151 @@ fn deps_missing_flag_only_shows_absent_files() {
     assert!(!out.contains("used_abs"));
 }
 
+// Option 1: a declared library (`-lib`/`-stdlib`/`import`) means an unknown
+// class is plausibly provided at runtime by a monolithic library that static
+// analysis cannot introspect. Such classes must NOT be reported as MISSING;
+// they get a distinct "unresolved (library declared)" status and are excluded
+// from `--missing`.
+
+fn write_tmp(content: &str) -> tempfile::NamedTempFile {
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), content).unwrap();
+    tmp
+}
+
+#[test]
+fn deps_declared_lib_class_not_reported_missing() {
+    // `-lib cyclone` declared; [coll] has no file on disk but is provided by
+    // the (monolithic) cyclone library at runtime.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    // Still listed so a human can see it...
+    assert!(out.contains("coll"), "class must still be listed: {out}");
+    // ...but not as a hard MISSING.
+    assert!(
+        !out.contains("MISSING"),
+        "declared-lib class must not be MISSING: {out}"
+    );
+    // A distinct status mentioning the declared library.
+    assert!(
+        out.contains("cyclone") && out.to_lowercase().contains("lib"),
+        "status should mention the declared library: {out}"
+    );
+}
+
+#[test]
+fn deps_declared_lib_class_excluded_from_missing_flag() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap(), "--missing"]);
+    assert!(
+        !out.contains("coll"),
+        "--missing must exclude classes covered by a declared library: {out}"
+    );
+}
+
+#[test]
+fn deps_stdlib_declaration_also_suppresses_missing() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -stdlib zexy;\n\
+         #X obj 50 50 demux;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        !out.contains("MISSING"),
+        "-stdlib must suppress MISSING: {out}"
+    );
+    assert!(out.contains("zexy"), "status should name the library: {out}");
+}
+
+#[test]
+fn deps_import_object_declares_library() {
+    // ELSE's [import cyclone] loads the cyclone namespace, so [coll] resolves.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 20 20 import cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        !out.contains("MISSING"),
+        "[import cyclone] must suppress MISSING for coll: {out}"
+    );
+}
+
+#[test]
+fn deps_no_declared_lib_still_missing() {
+    // Regression guard against over-suppression: with NO library declared,
+    // an unresolvable class is still MISSING.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        out.contains("coll") && out.contains("MISSING"),
+        "undeclared unresolvable class must remain MISSING: {out}"
+    );
+}
+
+#[test]
+fn deps_declared_lib_does_not_suppress_found_abstractions() {
+    // A declared lib must not change how genuinely-resolvable abstractions are
+    // reported: used_abs.pd still resolves as found, missing_abs stays
+    // unresolved-but-lib-declared (not MISSING).
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("used_abs.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+    let main = dir.path().join("main.pd");
+    std::fs::write(
+        &main,
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 used_abs;\n\
+         #X obj 50 100 coll;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&["deps", main.to_str().unwrap()]);
+    assert!(out.contains("used_abs"), "{out}");
+    assert!(
+        out.contains("found:"),
+        "resolvable abstraction still reported as found: {out}"
+    );
+    assert!(!out.contains("MISSING"), "{out}");
+}
+
+#[test]
+fn deps_declared_lib_json_carries_declared_libs() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap(), "--json"]);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let coll = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["name"] == "coll")
+        .expect("coll entry present in JSON");
+    assert_eq!(coll["found"], serde_json::json!(false));
+    let libs = coll["declared_libs"]
+        .as_array()
+        .expect("declared_libs array present");
+    assert!(
+        libs.iter().any(|l| l == "cyclone"),
+        "declared_libs must contain cyclone: {out}"
+    );
+}
+
 #[test]
 fn deps_recursive_follows_chain() {
     let f = abs_dir().join("uses_abstractions.pd");
@@ -357,7 +502,7 @@ fn deps_expanded_builtins_not_missing() {
         "stripnote",
     ] {
         assert!(
-            !out.contains(&format!("{} (MISSING", name)),
+            !out.contains(&format!("{name} (MISSING")),
             "core builtin {name} should not be MISSING. output: {out}"
         );
     }
@@ -694,8 +839,11 @@ fn deps_recursive_buses_reports_unsatisfied() {
 
 #[test]
 fn deps_recursive_buses_dollar_names_excluded() {
-    // contract_inner.pd has [r $0-internal] and [s $1-arg_bus]. Both
-    // must be excluded from cross-file contracts.
+    // contract_inner.pd has [r \$0-internal] and [s \$1-arg_bus]. $0 is
+    // instance-scoped and always excluded; $1 is realized against call-site
+    // args, but this caller supplies NO args, so $1 is unrealizable and also
+    // does not appear. (Feature F adds realization; see the tests below for
+    // the with-argument behaviour.)
     let caller = tempfile::NamedTempFile::new().unwrap();
     let dir_arg = abs_dir();
     std::fs::write(
@@ -722,6 +870,100 @@ fn deps_recursive_buses_dollar_names_excluded() {
     assert!(
         !section.contains("$1-arg_bus") && !section.contains("\\$1-arg_bus"),
         "$1 name leaked into cross-file contract: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_realizes_dollar_arg_in_contract() {
+    // Feature F: contract_inner.pd has [s \$1-arg_bus]. Instantiated as
+    // `contract_inner voice`, $1 -> voice, so the abstraction sends on
+    // `voice-arg_bus` and the caller (lacking a matching receiver) must be
+    // told it needs a receiver for the REALIZED name.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n#X obj 50 50 contract_inner voice;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        section.contains("voice-arg_bus") && section.contains("needs_receiver"),
+        "realized $1 bus name must appear: {out}"
+    );
+    // The unrealized literal must NOT leak.
+    assert!(
+        !section.contains("$1-arg_bus") && !section.contains("\\$1-arg_bus"),
+        "unrealized $1 literal leaked: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_realized_dollar_arg_satisfied_by_caller() {
+    // Feature F: when the caller provides the realized receiver
+    // (`[r voice-arg_bus]`), the $1-derived contract is satisfied and must
+    // NOT be reported.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n\
+         #X obj 50 20 r voice-arg_bus;\n\
+         #X obj 50 60 contract_inner voice;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        !section.contains("voice-arg_bus"),
+        "realized bus satisfied by caller must not be reported: {out}"
+    );
+}
+
+#[test]
+fn deps_recursive_buses_message_box_send_satisfies_contract() {
+    // Feature A + F synergy: the caller drives the abstraction's [r control_bus]
+    // from a MESSAGE BOX (`\; control_bus 1`), which counts as a sender, so
+    // the contract is satisfied and not reported as needs_sender.
+    let caller = tempfile::NamedTempFile::new().unwrap();
+    let dir_arg = abs_dir();
+    std::fs::write(
+        caller.path(),
+        "#N canvas 0 22 300 200 12;\n\
+         #X msg 50 20 \\; control_bus 1;\n\
+         #X obj 50 60 contract_inner;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&[
+        "deps",
+        caller.path().to_str().unwrap(),
+        "--buses",
+        "--recursive",
+        "--search-path",
+        dir_arg.to_str().unwrap(),
+    ]);
+    let section_start = out.find("Unsatisfied bus contracts").unwrap_or(out.len());
+    let section = &out[section_start..];
+    assert!(
+        !section.contains("control_bus"),
+        "message-box send must satisfy the [r control_bus] contract: {out}"
     );
 }
 

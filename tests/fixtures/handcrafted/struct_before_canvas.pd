@@ -1,0 +1,6 @@
+#N struct point float x float y;
+#N canvas 0 22 450 300 12;
+#X obj 50 50 loadbang;
+#X scalar point 10 20;
+#X obj 50 150 print;
+#X connect 0 0 2 0;

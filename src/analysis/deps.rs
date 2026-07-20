@@ -329,6 +329,60 @@ pub struct DepEntry {
     /// `None` for missing or abstraction-resolved entries.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<BuiltinSource>,
+    /// Libraries declared in this canvas (or an ancestor) via
+    /// `#X declare -lib`/`-stdlib` or an ELSE-style `[import ...]` object,
+    /// which may provide this class at runtime from a monolithic binary that
+    /// static analysis cannot introspect.
+    ///
+    /// Non-empty only for an otherwise-unresolved class when at least one
+    /// library is declared; always empty for found or builtin classes. Such
+    /// an entry is reported as `unresolved (library declared)` rather than
+    /// `MISSING`, and is excluded from `--missing`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub declared_libs: Vec<String>,
+}
+
+/// Collect the libraries a canvas loads via `#X declare -lib`/`-stdlib` or an
+/// ELSE-style `[import ...]` object, in document order (deduplicated).
+///
+/// A declared library may register object classes that live inside a single
+/// (monolithic) binary — e.g. `-lib zexy` provides `[demux]` — which have no
+/// per-class file on disk, so `deps` cannot confirm or deny them. Their
+/// presence downgrades an unresolved class from `MISSING` to
+/// `unresolved (library declared)`.
+fn declared_libraries(entries: &[crate::model::Entry]) -> Vec<String> {
+    let mut libs: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut push = |name: &str| {
+        let n = name.trim_end_matches(';');
+        if !n.is_empty() && seen.insert(n.to_string()) {
+            libs.push(n.to_string());
+        }
+    };
+    for e in entries {
+        match e.kind {
+            EntryKind::Declare => {
+                let toks: Vec<&str> = e.raw.trim_end_matches(';').split_whitespace().collect();
+                let mut i = 2; // skip `#X declare`
+                while i < toks.len() {
+                    if (toks[i] == "-lib" || toks[i] == "-stdlib") && i + 1 < toks.len() {
+                        push(toks[i + 1]);
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+            // ELSE's `[import lib ...]` loads one or more library namespaces.
+            EntryKind::Obj if e.class() == "import" => {
+                for a in e.args() {
+                    push(&a);
+                }
+            }
+            _ => {}
+        }
+    }
+    libs
 }
 
 /// Collect abstraction search paths from `#X declare -path dir` entries in a file.
@@ -385,6 +439,49 @@ fn is_patch_file(path: &Path) -> bool {
     )
 }
 
+/// Resolve an object class to a patch (abstraction) file relative to `file`.
+///
+/// Searches the patch's own directory and any `#X declare -path` directories
+/// (matching Pd's own-canvas resolution order), then filters to patch files
+/// (`.pd`/`.pat`) only — compiled and Lua externals cannot be introspected.
+/// `content` is the already-read text of `file` (used to find declares).
+#[must_use]
+pub fn resolve_abstraction(class: &str, file: &Path, content: &str) -> Option<PathBuf> {
+    let base = file.parent().unwrap_or(Path::new("."));
+    let mut dirs = vec![base.to_path_buf()];
+    dirs.extend(declare_paths(file, content));
+    let path = locate_abstraction(class, &dirs)?;
+    is_patch_file(&path).then_some(path)
+}
+
+/// Count an abstraction's top-level inlets and outlets, returning
+/// `(inlets, outlets)`.
+///
+/// An abstraction's control/signal I/O is fixed by the `inlet`/`inlet~` and
+/// `outlet`/`outlet~` objects on its top-level canvas (both rates share one
+/// numbering space in Pd). Only depth-0 objects count — inlet/outlet objects
+/// nested inside the abstraction's own subpatches belong to those subpatches.
+/// Returns `None` if the file cannot be read or parsed.
+#[must_use]
+pub fn abstraction_io_counts(path: &Path) -> Option<(usize, usize)> {
+    let content = crate::parser::decode_lenient(&std::fs::read(path).ok()?);
+    let patch = parse(&content).ok()?;
+    let mut inlets = 0usize;
+    let mut outlets = 0usize;
+    for e in &patch.entries {
+        // Top-level objects live at internal depth 1 (user depth 0).
+        if e.kind != EntryKind::Obj || e.depth != 1 {
+            continue;
+        }
+        match e.class() {
+            "inlet" | "inlet~" => inlets += 1,
+            "outlet" | "outlet~" => outlets += 1,
+            _ => {}
+        }
+    }
+    Some((inlets, outlets))
+}
+
 /// Search for an object class's implementation file across `search_dirs`.
 ///
 /// For each directory, tries `name.<ext>` and the `name/name.<ext>`
@@ -410,7 +507,7 @@ fn locate_abstraction(name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
 /// Analyse one file and collect dependency entries.
 /// `visited` prevents re-processing the same file in recursive mode.
 pub fn analyse_file(file: &Path, recursive: bool, visited: &mut HashSet<PathBuf>) -> Vec<DepEntry> {
-    analyse_file_with_ancestors(file, recursive, visited, &[], &[])
+    analyse_file_with_ancestors(file, recursive, visited, &[], &[], &[])
 }
 
 /// Like `analyse_file`, but also searches `extra_dirs` as a fallback after
@@ -421,7 +518,7 @@ pub fn analyse_file_with_extra(
     visited: &mut HashSet<PathBuf>,
     extra_dirs: &[PathBuf],
 ) -> Vec<DepEntry> {
-    analyse_file_with_ancestors(file, recursive, visited, &[], extra_dirs)
+    analyse_file_with_ancestors(file, recursive, visited, &[], extra_dirs, &[])
 }
 
 /// Internal: analyse a file, honoring ancestor canvases' search directories.
@@ -431,12 +528,17 @@ pub fn analyse_file_with_extra(
 /// own directory and its `#X declare -path` entries. Thus a child abstraction
 /// with no declares of its own still resolves references via its caller's
 /// declares.
+///
+/// `ancestor_libs` carries `-lib`/`-stdlib`/`import` declarations from the
+/// owner chain: Pd loads libraries process-globally, so a class used in a
+/// child abstraction may be provided by a library the caller declared.
 fn analyse_file_with_ancestors(
     file: &Path,
     recursive: bool,
     visited: &mut HashSet<PathBuf>,
     ancestor_dirs: &[PathBuf],
     extra_dirs: &[PathBuf],
+    ancestor_libs: &[String],
 ) -> Vec<DepEntry> {
     let canon = match file.canonicalize() {
         Ok(p) => p,
@@ -446,9 +548,10 @@ fn analyse_file_with_ancestors(
         return Vec::new(); // already processed
     }
 
-    let Ok(content) = std::fs::read_to_string(file) else {
+    let Ok(bytes) = std::fs::read(file) else {
         return Vec::new();
     };
+    let content = crate::parser::decode_lenient(&bytes);
     let Ok(patch) = parse(&content) else {
         return Vec::new();
     };
@@ -462,6 +565,12 @@ fn analyse_file_with_ancestors(
     let mut search_dirs = own_dirs.clone();
     search_dirs.extend(ancestor_dirs.iter().cloned());
     search_dirs.extend(extra_dirs.iter().cloned());
+
+    // Libraries declared here plus any inherited from the owner chain. An
+    // unresolved class is attributed to these rather than reported MISSING.
+    let mut all_libs = declared_libraries(&patch.entries);
+    all_libs.extend(ancestor_libs.iter().cloned());
+    all_libs.dedup();
 
     let mut results = Vec::new();
 
@@ -496,6 +605,13 @@ fn analyse_file_with_ancestors(
         };
         let found = source.is_some() || location.is_some();
         let found_at = location.as_ref().map(|p| p.display().to_string());
+        // Attribute an unresolved class to any declared library (it may live
+        // inside a monolithic binary we cannot introspect).
+        let declared_libs = if found || all_libs.is_empty() {
+            Vec::new()
+        } else {
+            all_libs.clone()
+        };
 
         results.push(DepEntry {
             file: file.display().to_string(),
@@ -505,6 +621,7 @@ fn analyse_file_with_ancestors(
             found,
             found_at: found_at.clone(),
             source,
+            declared_libs,
         });
 
         // Recursive: follow found abstractions (patch files only; compiled and
@@ -514,8 +631,14 @@ fn analyse_file_with_ancestors(
             && let Some(ref abs_path) = location
             && is_patch_file(abs_path)
         {
-            let sub_results =
-                analyse_file_with_ancestors(abs_path, recursive, visited, &search_dirs, extra_dirs);
+            let sub_results = analyse_file_with_ancestors(
+                abs_path,
+                recursive,
+                visited,
+                &search_dirs,
+                extra_dirs,
+                &all_libs,
+            );
             results.extend(sub_results);
         }
     }
@@ -560,6 +683,88 @@ mod tests {
         assert_eq!(builtin_source("bob~"), Some(BuiltinSource::CoreExtra));
         assert_eq!(builtin_source("slop~"), Some(BuiltinSource::CoreExtra));
         assert_eq!(builtin_source("definitely_not_a_class"), None);
+    }
+
+    #[test]
+    fn declared_libraries_parses_lib_stdlib_and_import() {
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X declare -lib cyclone -path ./abs -stdlib zexy;\n\
+                     #X obj 20 20 import else;\n\
+                     #X obj 20 60 coll;\n";
+        let patch = parse(input).unwrap();
+        let libs = declared_libraries(&patch.entries);
+        assert_eq!(libs, vec!["cyclone", "zexy", "else"]);
+    }
+
+    #[test]
+    fn declared_libraries_dedups_and_ignores_paths() {
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X declare -lib cyclone;\n\
+                     #X declare -lib cyclone -path foo;\n";
+        let patch = parse(input).unwrap();
+        assert_eq!(declared_libraries(&patch.entries), vec!["cyclone"]);
+    }
+
+    #[test]
+    fn declared_libraries_empty_when_none() {
+        let input = "#N canvas 0 22 450 300 12;\n#X obj 20 20 coll;\n";
+        let patch = parse(input).unwrap();
+        assert!(declared_libraries(&patch.entries).is_empty());
+    }
+
+    #[test]
+    fn abstraction_io_counts_top_level_only() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("pdtk_io_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("voice.pd");
+        // Two inlets (one control, one signal), one outlet at top level; the
+        // inlet inside the subpatch must NOT be counted.
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(
+            f,
+            "#N canvas 0 22 450 300 12;\n\
+             #X obj 20 20 inlet;\n\
+             #X obj 60 20 inlet~;\n\
+             #X obj 20 200 outlet;\n\
+             #N canvas 0 22 200 200 sub 0;\n\
+             #X obj 10 10 inlet;\n\
+             #X restore 100 100 pd sub;\n"
+        )
+        .unwrap();
+        assert_eq!(abstraction_io_counts(&path), Some((2, 1)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn abstraction_io_counts_missing_file_is_none() {
+        assert_eq!(
+            abstraction_io_counts(Path::new("/nonexistent/does_not_exist.pd")),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_abstraction_finds_sibling_patch() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("pdtk_res_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let caller = dir.join("main.pd");
+        let abs = dir.join("myabs.pd");
+        std::fs::File::create(&abs)
+            .unwrap()
+            .write_all(b"#N canvas 0 22 450 300 12;\n#X obj 20 20 inlet;\n")
+            .unwrap();
+        let content = "#N canvas 0 22 450 300 12;\n#X obj 10 10 myabs;\n";
+        std::fs::File::create(&caller)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+        let resolved = resolve_abstraction("myabs", &caller, content);
+        assert_eq!(resolved.as_deref(), Some(abs.as_path()));
+        // An unknown class resolves to nothing.
+        assert_eq!(resolve_abstraction("nope", &caller, content), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

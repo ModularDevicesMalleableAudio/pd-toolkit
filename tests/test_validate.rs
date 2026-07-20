@@ -41,7 +41,7 @@ fn validate_all_corpus_files_exit_0() {
     let dir = corpus_dir();
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
 
@@ -149,7 +149,7 @@ fn validate_json_output_includes_error_list() {
     assert_eq!(out.status.code(), Some(1));
     let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
     assert_eq!(json["valid"], false);
-    assert!(json["errors"].as_array().unwrap().len() >= 1);
+    assert!(!json["errors"].as_array().unwrap().is_empty());
 }
 
 #[test]
@@ -362,4 +362,256 @@ fn validate_no_inlet_warning_for_bare_send_right_inlet() {
         !s.contains("inlet"),
         "bare [send]/[s] right-inlet wiring is valid; got:\n{s}"
     );
+}
+
+// Feature E: a stray unescaped ';' in a message body splits the entry and
+// leaves a bare fragment. validate flags the fragment (warning, not error).
+
+#[test]
+fn validate_flags_stray_fragment_from_unescaped_semicolon() {
+    let input = "#N canvas 0 22 450 300 12;\n#X msg 10 10 foo ; bar;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "stray fragment is a warning");
+    let s = stdout_string(&out);
+    assert!(s.contains("stray content"), "got:\n{s}");
+    assert!(s.contains("unescaped ';'"), "got:\n{s}");
+}
+
+// Feature B: validate resolves unknown classes as project-local abstractions
+// and checks connection inlet/outlet indices against the abstraction's real
+// I/O count (number of top-level inlet/outlet objects).
+
+/// Write `abs.pd` and `main.pd` into a fresh dir and return the dir + main path.
+fn abstraction_project(abs: &str, main: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("voice.pd"), abs).unwrap();
+    let main_path = dir.path().join("main.pd");
+    std::fs::write(&main_path, main).unwrap();
+    (dir, main_path)
+}
+
+#[test]
+fn validate_warns_on_abstraction_inlet_out_of_range() {
+    // voice.pd has exactly 1 inlet; wiring into inlet 1 is out of range.
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 loadbang;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 0 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "arity mismatch is a warning");
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 inlet(s)") && s.contains("inlet 1"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_warns_on_abstraction_outlet_out_of_range() {
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 voice;\n\
+                #X obj 10 60 print;\n\
+                #X connect 0 2 1 0;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 outlet(s)") && s.contains("outlet 2"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_warning_for_valid_abstraction_connection() {
+    // Two inlets, two outlets: wiring outlet 1 -> inlet 1 is valid.
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 60 20 inlet;\n\
+               #X obj 20 200 outlet;\n\
+               #X obj 60 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 voice;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 1 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("abstraction"),
+        "valid abstraction wiring must not warn; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_abstraction_arity_counts_top_level_only() {
+    // 1 top-level inlet + 1 inlet nested in a subpatch = arity 1. Wiring
+    // inlet 1 must warn (the nested inlet is not part of the interface).
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #N canvas 0 22 200 200 sub 0;\n\
+               #X obj 10 10 inlet;\n\
+               #X restore 100 100 pd sub;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 loadbang;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 0 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 inlet(s)"),
+        "nested inlet must not count toward arity; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_arity_warning_for_unresolvable_external() {
+    // No sibling file named my_external.pd -> cannot introspect -> no warning
+    // even for a large outlet index (could be a compiled external).
+    let dir = tempfile::tempdir().unwrap();
+    let main_path = dir.path().join("main.pd");
+    std::fs::write(
+        &main_path,
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 10 10 my_external;\n\
+         #X obj 10 60 print;\n\
+         #X connect 0 7 1 0;\n",
+    )
+    .unwrap();
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("outlet") && !s.contains("abstraction"),
+        "unresolvable external must not warn; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_stray_warning_for_inline_scalar_data() {
+    // Real inline scalars are a SINGLE `\;`-escaped entry (Pd escapes the
+    // internal separators), not bare data lines. So a data-structure patch
+    // has no bare fragments and the stray-fragment check must stay silent.
+    let input = "#N struct holder float x float y array z element;\n\
+                 #N struct element float v;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar holder 5 6 \\; 1 \\; 2 \\;;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("stray content"),
+        "inline scalar data is one entry, not a stray fragment; got:\n{s}"
+    );
+}
+
+// D1: template/scalar consistency checks (warnings, never errors) that mirror
+// Pd's own load-time diagnostics.
+
+#[test]
+fn validate_warns_on_scalar_undefined_template() {
+    // A `#X scalar ghost` with no `#N struct ghost` — Pd raises
+    // "no such template" and drops the scalar at load.
+    let input = "#N canvas 0 22 450 300 12;\n#X scalar ghost 1 2;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "consistency issue is a warning");
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("undefined template") && s.contains("ghost"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_warns_on_scalar_field_count_mismatch() {
+    // Template `point` has 2 scalar fields; the scalar supplies 3 flat values.
+    let input = "#N struct point float x float y;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar point 1 2 3;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("point") && s.contains("field"),
+        "expected a field-count warning; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_warning_for_consistent_scalar() {
+    let input = "#N struct point float x float y;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar point 10 20;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("template") && !s.contains("field"),
+        "consistent scalar must not warn; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_scalar_with_array_field_counts_flat_only() {
+    // holder has 2 scalar fields (x, y) plus an array field (z). The flat
+    // value block (before the first `\;`) is `5 6` = 2, which matches; the
+    // array element data must NOT be counted toward the scalar field count.
+    let input = "#N struct holder float x float y array z element;\n\
+                 #N struct element float v;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar holder 5 6 \\; 1 \\; 2 \\;;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("field") && !s.contains("undefined template"),
+        "array-field scalar must validate cleanly; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_dangling_warning_for_dollar_template() {
+    // A `$`-scoped template name is realized per-instance; static matching is
+    // unreliable, so it must not produce a false "undefined template" warning.
+    let input = "#N canvas 0 22 450 300 12;\n#X scalar \\$0-foo 1 2;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(!s.contains("undefined template"), "got:\n{s}");
 }

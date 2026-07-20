@@ -141,12 +141,54 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 | Entry type | Example | Why |
 |---|---|---|
 | `#N canvas` | `#N canvas 0 22 450 300 12;` | Canvas header |
+| `#N struct` | `#N struct point float x float y;` | Data-structure template definition (not a gobj) |
 | `#X connect` | `#X connect 0 0 1 0;` | Connection reference |
 | `#X coords` | `#X coords 0 7 16 0 200 140 1 0 0;` | Graph config |
 | `#X declare` | `#X declare -path pos_abs;` | Standalone directive |
 | `#X f` | `#X f 115;` | Width hint for preceding object |
 | `#A` | `#A 0 0 0 0;` | Array data |
 | `#C` | `#C restore;` | Non-standard/corrupted |
+
+### Templates before the root canvas (`#N struct`)
+
+A file may begin with one or more `#N struct` template definitions **before**
+the root `#N canvas` (Pd's `canvas_savetemplatesto`). `parse` therefore does
+not require the first entry to be `#N canvas`; it requires that a `#N canvas`
+exists and that every entry preceding it is a `#N struct`. A `#N struct` is
+`EntryKind::Struct`, is not a gobj (no connect index), and lives at whatever
+depth it appears (depth 0 when before the root canvas). Getting this wrong
+means pdtk cannot open real data-structure patches at all — many real-world
+patches (both help files and abstractions) begin with one or more `#N struct`
+definitions.
+
+`model::parse_struct` / `parse_scalar` decode these entries (a template's typed
+fields; a scalar's `(template, flat_values)`, where flat values stop at the
+first `\;` separator — inline scalar array data is `\;`-escaped, so a scalar is
+a single entry, never bare data lines). `validate` uses them to warn on a
+scalar referencing an undefined template or a scalar/template field-count
+mismatch (mirroring Pd's load-time errors), and the `structs` command lists
+templates and scalars. `$`-scoped template names are skipped by the dangling
+check (realized per-instance, so static matching is unreliable).
+
+### File encoding & reading (Option E)
+
+Pd is byte-oriented and loads patches in any encoding. pdtk splits reads by
+intent:
+
+- **Read-only / analysis** commands read via `io::read_patch_lenient` (and the
+  lib analysis modules via `parser::decode_lenient`): invalid UTF-8 bytes
+  become `U+FFFD`. PD structure is ASCII, so parsing stays correct; only
+  non-ASCII comment/label text is lossy. This is why `deps`/`stats` no longer
+  silently skip non-UTF-8 files (which quietly corrupted directory-mode
+  results).
+- **Write-capable** commands read via `io::read_patch_file` (strict UTF-8) and
+  **refuse** a non-UTF-8 file with a clear error, so an in-place edit can never
+  corrupt bytes that lossy decoding can't reproduce. Never switch a mutating
+  command to the lenient reader.
+
+`parse` strips a leading UTF-8 BOM. `serialize` always ends the file with
+exactly one `\n` (Pd's canonical form); a newline-less input is normalized to
+include one — the sole intentional exception to byte-exact round-tripping.
 
 ### `#X restore` depth rule
 
@@ -194,6 +236,17 @@ compiled externals (`.pd_linux`/`.l_amd64`/`.so`/`.pd_darwin`/`.dll`/…),
 loader externals (`.pd_lua`, `.pd_luax`), then abstractions (`.pd`, `.pat`,
 and the `name/name.pd` class-in-folder convention). `deps` mirrors this set;
 checking only `.pd` reports Lua/compiled externals as false `MISSING`.
+
+A `#X declare -lib`/`-stdlib` (and the ELSE `[import]` object) loads a library
+that may register classes living inside a single (monolithic) binary — e.g.
+`-lib zexy` provides `[demux]` with no per-class file. `deps` cannot introspect
+those binaries, so an unresolved class is attributed to any declared library
+(`unresolved (library declared)`) instead of `MISSING`, and excluded from
+`--missing`. Library declarations are collected by `declared_libraries()` and,
+like `-path`, inherited down the abstraction owner chain (Pd loads libraries
+process-globally). This trades recall for precision: a declared library also
+suppresses a genuinely-missing typo, so the class stays listed (just not as
+`MISSING`) for a human to scan.
 
 ## Code Style
 
@@ -268,10 +321,11 @@ git diff tests/fixtures/
 2. **Don't count `#X f N` as an object** — it's a width hint that follows `#X restore`
 3. **DO count `#X array` and `#X scalar` as objects** — they are `gobj`s in Pd and take a connect index; not counting them mis-indexes connections in a canvas that mixes an array/scalar with wired objects
 4. **Sibling subpatches don't share an index space** — objects inside two same-depth `pd` subpatches both start at index 0; use `--canvas N` (and the canvas-scoped `Patch` helpers) to disambiguate
-5. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content
+5. **`\;` is NOT a terminator** — it's an escaped semicolon inside message content. But an *unescaped* `;` terminates an entry **anywhere**, not only at end-of-line: the tokenizer splits on every unescaped `;` (matching Pd's `binbuf_text`), so `a; b;` on one physical line is two entries. A stray unescaped `;` in a message body therefore produces a bare fragment entry (flagged by `validate`).
 6. **`#X restore` changes depth BEFORE getting an index** — pop depth first, then assign index at new depth.
    Example: depth-0 has `obj_A` (idx 0), `obj_B` (idx 1), then a subpatch opens. Inside at depth-1: `obj_C` (idx 0), `obj_D` (idx 1). The `#X restore` pops depth 1→0 and receives idx **2** at depth 0. Wrong: assigning it idx 2 at depth 1 corrupts every parent-level connection.
-7. **Multi-line entries** — continuation lines don't start with `#`. Only lines starting with `#` begin new entries.
+7. **Multi-line entries** — a single entry may span physical lines; continuation lines are joined until an unescaped `;` terminator is reached (Pd inserts no column wrapping, only a newline after each real `;`).
 8. **`, f N` at end of an entry** — this is an inline width hint, NOT part of the object class or arguments
 9. **`f` as an object class** — `#X obj 50 50 f;` is a float box. Don't confuse with width hints.
+10. **Message boxes are senders too** — a `\;`-introduced sub-message targets a named receiver (`#X msg ... \; pitch 60;` sends to `[r pitch]`). The first token after each `\;` is the target; the leading (pre-`\;`) message goes out the box outlet and is NOT a target. Send/receive analysis (`send_receive::collect_sends`) and `rename-send` both handle these via `model::message_send_targets`. Engine/canvas targets (`pd`, `pd-<name>`) are excluded from bus analysis but still renamable. Missing these silently breaks `rename-send`.
 

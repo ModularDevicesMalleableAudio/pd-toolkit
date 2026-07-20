@@ -363,6 +363,181 @@ fn rename_send_handles_listbox_receive_field() {
     assert!(result.contains("list_recv_renamed"));
 }
 
+// Feature A: message boxes send to named receivers via `\; name ...`.
+// rename-send must rewrite those targets or renaming silently breaks patches.
+
+#[test]
+fn rename_send_rewrites_message_box_target() {
+    // The ONLY driver of [r pitch] is a message box. Renaming the receive
+    // must also rewrite the `\; pitch` target, or the patch breaks silently.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 10 10 \\; pitch 60;\n\
+                 #X obj 10 60 r pitch;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "pitch",
+        "--to",
+        "note_pitch",
+        "--in-place",
+    ]);
+    assert!(out.contains("2 replacement"), "got:\n{out}");
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains(r"\; note_pitch 60"),
+        "message target must be rewritten; got:\n{result}"
+    );
+    assert!(result.contains("r note_pitch"));
+    assert!(!result.contains("pitch 60") || result.contains("note_pitch 60"));
+    assert!(
+        !result.contains(" pitch;"),
+        "old receive name gone; got:\n{result}"
+    );
+}
+
+#[test]
+fn rename_send_rewrites_multiple_targets_in_one_message() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 10 10 \\; bus 1 \\; other 2 \\; bus 3;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "bus",
+        "--to",
+        "main_bus",
+        "--in-place",
+    ]);
+    // Two `\; bus` occurrences rewritten; `other` untouched.
+    assert!(out.contains("1 replacement"), "got:\n{out}");
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert_eq!(result.matches(r"\; main_bus").count(), 2, "got:\n{result}");
+    assert!(result.contains(r"\; other 2"));
+}
+
+#[test]
+fn rename_send_message_target_leaves_outlet_message_untouched() {
+    // The leading (pre-`\;`) message goes out the outlet, not to a receiver,
+    // so a token there that coincidentally equals `from` must NOT be renamed.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 10 10 foo 1 \\; foo 2;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "foo",
+        "--to",
+        "bar",
+        "--in-place",
+    ]);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    // Leading `foo 1` (outlet) preserved; only the `\; foo` target renamed.
+    assert!(
+        result.contains(r"#X msg 10 10 foo 1 \; bar 2;"),
+        "got:\n{result}"
+    );
+}
+
+#[test]
+fn rename_send_message_target_roundtrip_ab_ba() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 10 10 \\; clock go;\n\
+                 #X obj 10 60 r clock;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "clock",
+        "--to",
+        "clock_tmp",
+        "--in-place",
+    ]);
+    pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "clock_tmp",
+        "--to",
+        "clock",
+        "--in-place",
+    ]);
+    let after = std::fs::read_to_string(tmp.path()).unwrap();
+    assert_eq!(after, input, "A→B→A must round-trip message targets");
+}
+
+#[test]
+fn rename_send_message_target_refuses_if_target_exists() {
+    // `existing` is already a message target; renaming `clock` onto it should
+    // be refused by the safety check that scans message boxes too.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 10 10 \\; clock go \\; existing 1;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "clock",
+        "--to",
+        "existing",
+        "--in-place",
+    ]);
+    assert_ne!(
+        out.status.code(),
+        Some(0),
+        "must refuse: target already exists"
+    );
+}
+
+#[test]
+fn rename_send_corpus_escaped_semicolons_targets() {
+    // The real corpus fixture drives named receivers from message boxes.
+    let (tmp, _) = {
+        let src = std::fs::read_to_string(integration::fixture_path(
+            "corpus/escaped_semicolons_real.pd",
+        ))
+        .unwrap();
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), &src).unwrap();
+        (tmp, src)
+    };
+
+    let out = pdtk_output(&[
+        "rename-send",
+        tmp.path().to_str().unwrap(),
+        "--from",
+        "01_arrays_exist",
+        "--to",
+        "first_arrays",
+        "--in-place",
+    ]);
+    assert!(out.contains("1 replacement"), "got:\n{out}");
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    // The message send target is rewritten...
+    assert!(result.contains(r"\; first_arrays read"), "got:\n{result}");
+    // ...but the `.mseq` filename argument is left untouched (it is message
+    // content, not a send target).
+    assert!(
+        result.contains("01_arrays_exist.mseq"),
+        "filename argument must not be renamed; got:\n{result}"
+    );
+}
+
 #[test]
 fn rename_send_handles_inline_width_hint() {
     // A send/receive object whose name is the last token before a `, f N`

@@ -33,7 +33,7 @@ pub fn run(
     canvas: usize,
     json: bool,
 ) -> Result<String, PdtkError> {
-    let input = io::read_patch_file(file)?;
+    let input = io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
     let canvas_id = patch.resolve_canvas(depth, canvas).ok_or_else(|| {
