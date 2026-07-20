@@ -10,6 +10,12 @@ use crate::model::Patch;
 /// Each entry is written on its own "block" (multi-line entries preserve their
 /// internal newlines).  Entries are separated by a single `\n`, and the file
 /// ends with a trailing `\n`.
+///
+/// Trailing-newline normalization: the output always ends with exactly one
+/// `\n`, matching Pd's own writer (`binbuf_write` emits `\n` after every
+/// terminating `;`). An input that is missing its final newline is therefore
+/// normalized to include one — the single intentional exception to byte-exact
+/// round-tripping, and a move toward Pd-canonical form rather than away from it.
 #[must_use]
 pub fn serialize(patch: &Patch) -> String {
     let mut out = String::new();

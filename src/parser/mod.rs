@@ -9,12 +9,28 @@ pub use tokenizer::{TokenizeResult, TokenizeWarning, tokenize_entries};
 
 use crate::model::{EntryKind, ParseError, ParseWarning, Patch};
 
+/// Decode raw `.pd` file bytes into a `String` for parsing, tolerating
+/// non-UTF-8 content: invalid byte sequences become U+FFFD
+/// (`String::from_utf8_lossy`). PD's structural syntax is ASCII, so the result
+/// always parses structurally; only non-ASCII comment/label text is lossy.
+///
+/// Because lossy decoding is not reversible, this is for read-only analysis
+/// only — code that writes a file back must read strictly (mutating commands
+/// refuse non-UTF-8 rather than corrupt it).
+#[must_use]
+pub fn decode_lenient(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
 /// Parse a Pure Data `.pd` file into a `Patch`.
 ///
 /// Returns `Err` only for hard structural failures (empty input, missing
 /// canvas header).  Soft issues (e.g. unterminated entries) are recorded in
 /// `Patch::warnings`.
 pub fn parse(input: &str) -> Result<Patch, ParseError> {
+    // Tolerate a leading UTF-8 BOM (some editors prepend `EF BB BF`), which
+    // would otherwise defeat the `#N canvas` header check.
+    let input = input.strip_prefix('\u{feff}').unwrap_or(input);
     if input.trim().is_empty() {
         return Err(ParseError::EmptyInput);
     }

@@ -79,9 +79,10 @@ fn merge_participants(
 }
 
 fn audit_one_file(file: &Path) -> ParticipantMap {
-    let Ok(content) = std::fs::read_to_string(file) else {
+    let Ok(bytes) = std::fs::read(file) else {
         return ParticipantMap::new();
     };
+    let content = crate::parser::decode_lenient(&bytes);
     let Ok(patch) = parse(&content) else {
         return ParticipantMap::new();
     };
@@ -240,7 +241,7 @@ struct BusContract {
 }
 
 fn derive_contract(path: &Path) -> Option<BusContract> {
-    let content = std::fs::read_to_string(path).ok()?;
+    let content = crate::parser::decode_lenient(&std::fs::read(path).ok()?);
     let patch = parse(&content).ok()?;
     let sends = collect_sends(&patch.entries);
     let receives = collect_receives(&patch.entries);
@@ -266,9 +267,10 @@ pub fn unsatisfied_contracts<F>(caller_path: &Path, resolve: F) -> Vec<Unsatisfi
 where
     F: Fn(&str) -> Option<PathBuf>,
 {
-    let Ok(content) = std::fs::read_to_string(caller_path) else {
+    let Ok(bytes) = std::fs::read(caller_path) else {
         return Vec::new();
     };
+    let content = crate::parser::decode_lenient(&bytes);
     let Ok(patch) = parse(&content) else {
         return Vec::new();
     };

@@ -170,6 +170,26 @@ mismatch (mirroring Pd's load-time errors), and the `structs` command lists
 templates and scalars. `$`-scoped template names are skipped by the dangling
 check (realized per-instance, so static matching is unreliable).
 
+### File encoding & reading (Option E)
+
+Pd is byte-oriented and loads patches in any encoding. pdtk splits reads by
+intent:
+
+- **Read-only / analysis** commands read via `io::read_patch_lenient` (and the
+  lib analysis modules via `parser::decode_lenient`): invalid UTF-8 bytes
+  become `U+FFFD`. PD structure is ASCII, so parsing stays correct; only
+  non-ASCII comment/label text is lossy. This is why `deps`/`stats` no longer
+  silently skip non-UTF-8 files (which quietly corrupted directory-mode
+  results).
+- **Write-capable** commands read via `io::read_patch_file` (strict UTF-8) and
+  **refuse** a non-UTF-8 file with a clear error, so an in-place edit can never
+  corrupt bytes that lossy decoding can't reproduce. Never switch a mutating
+  command to the lenient reader.
+
+`parse` strips a leading UTF-8 BOM. `serialize` always ends the file with
+exactly one `\n` (Pd's canonical form); a newline-less input is normalized to
+include one — the sole intentional exception to byte-exact round-tripping.
+
 ### `#X restore` depth rule
 
 `#X restore` **closes** the current subpatch depth and is assigned an index at the **parent** depth. The depth stack must be decremented before assigning the index.

@@ -18,7 +18,7 @@ pub fn run(
     output: Option<&str>,
     verbose: bool,
 ) -> Result<String, PdtkError> {
-    let input = std::fs::read_to_string(file)?;
+    let input = crate::io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
     // When --output is given, write the re-serialized .pd file there.

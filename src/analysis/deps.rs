@@ -464,7 +464,7 @@ pub fn resolve_abstraction(class: &str, file: &Path, content: &str) -> Option<Pa
 /// Returns `None` if the file cannot be read or parsed.
 #[must_use]
 pub fn abstraction_io_counts(path: &Path) -> Option<(usize, usize)> {
-    let content = std::fs::read_to_string(path).ok()?;
+    let content = crate::parser::decode_lenient(&std::fs::read(path).ok()?);
     let patch = parse(&content).ok()?;
     let mut inlets = 0usize;
     let mut outlets = 0usize;
@@ -548,9 +548,10 @@ fn analyse_file_with_ancestors(
         return Vec::new(); // already processed
     }
 
-    let Ok(content) = std::fs::read_to_string(file) else {
+    let Ok(bytes) = std::fs::read(file) else {
         return Vec::new();
     };
+    let content = crate::parser::decode_lenient(&bytes);
     let Ok(patch) = parse(&content) else {
         return Vec::new();
     };

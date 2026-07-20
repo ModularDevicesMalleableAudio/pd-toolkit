@@ -33,7 +33,7 @@ pub fn run(
     fan_out: bool,
     dsp_loop: bool,
 ) -> Result<LintResult, PdtkError> {
-    let input = io::read_patch_file(file)?;
+    let input = io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
     let mut errors: Vec<String> = Vec::new();

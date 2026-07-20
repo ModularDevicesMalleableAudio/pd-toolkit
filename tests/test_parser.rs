@@ -529,6 +529,18 @@ fn roundtrip_minimal() {
 }
 
 #[test]
+fn serialize_normalizes_missing_trailing_newline() {
+    // Pd's writer always emits a final newline; an input missing one is
+    // normalized to include exactly one — the single intentional exception to
+    // byte-exact round-tripping (toward Pd-canonical form). See rewrite::serialize.
+    let input = "#N canvas 0 22 450 300 12;\n#X obj 20 50 dac~;"; // no trailing \n
+    let out = serialize(&parse(input).unwrap());
+    assert_eq!(out, format!("{input}\n"));
+    // And the normalized form then round-trips exactly (idempotent).
+    assert_eq!(serialize(&parse(&out).unwrap()), out);
+}
+
+#[test]
 fn roundtrip_simple_chain() {
     assert_roundtrip("simple_chain.pd", handcrafted("simple_chain.pd"));
 }

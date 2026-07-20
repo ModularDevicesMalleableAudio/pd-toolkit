@@ -157,7 +157,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
 
     let mut rows: Vec<Row> = Vec::new();
     for file in files {
-        let Ok(input) = std::fs::read_to_string(&file) else {
+        let Ok(input) = crate::io::read_patch_lenient(&file) else {
             continue;
         };
         let Ok(patch) = parse(&input) else { continue };

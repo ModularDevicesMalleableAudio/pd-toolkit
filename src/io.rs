@@ -2,9 +2,32 @@ use crate::errors::PdtkError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Read a .pd file from disk.
+/// Read a .pd file from disk as strict UTF-8.
+///
+/// Used by write-capable commands: a non-UTF-8 file is refused with a clear
+/// message rather than silently lossy-decoded, so an in-place edit can never
+/// corrupt non-UTF-8 comment/label content. Read-only commands should use
+/// [`read_patch_lenient`] instead.
 pub fn read_patch_file(path: &str) -> Result<String, PdtkError> {
-    fs::read_to_string(path).map_err(PdtkError::from)
+    match fs::read_to_string(path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => Err(PdtkError::Usage(format!(
+            "{path}: not valid UTF-8 — pdtk can analyse this file (e.g. `parse`, `list`, \
+             `deps`) but refuses to edit it to avoid corrupting non-UTF-8 content"
+        ))),
+        Err(e) => Err(PdtkError::from(e)),
+    }
+}
+
+/// Read a .pd file for read-only analysis, tolerating non-UTF-8 content.
+///
+/// Invalid byte sequences are replaced with U+FFFD (see
+/// [`pdtk::parser::decode_lenient`]); PD structure is ASCII, so parsing stays
+/// correct. Accepts any path type so directory-scan loops (which hold
+/// `PathBuf`s) can use it directly.
+pub fn read_patch_lenient(path: impl AsRef<Path>) -> Result<String, PdtkError> {
+    let bytes = fs::read(path)?;
+    Ok(pdtk::parser::decode_lenient(&bytes))
 }
 
 /// Write content to a file at the given path.
