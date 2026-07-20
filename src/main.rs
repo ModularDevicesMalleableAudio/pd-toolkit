@@ -288,6 +288,18 @@ fn main() {
                 e.exit_code()
             }
         },
+        Some(Commands::Structs { target, json }) => match commands::structs::run(&target, json) {
+            Ok(out) => {
+                if !out.is_empty() {
+                    println!("{out}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                e.exit_code()
+            }
+        },
         Some(Commands::Modify {
             file,
             depth,

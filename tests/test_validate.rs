@@ -525,3 +525,93 @@ fn validate_no_stray_warning_for_inline_scalar_data() {
         "inline scalar data is one entry, not a stray fragment; got:\n{s}"
     );
 }
+
+// D1: template/scalar consistency checks (warnings, never errors) that mirror
+// Pd's own load-time diagnostics.
+
+#[test]
+fn validate_warns_on_scalar_undefined_template() {
+    // A `#X scalar ghost` with no `#N struct ghost` — Pd raises
+    // "no such template" and drops the scalar at load.
+    let input = "#N canvas 0 22 450 300 12;\n#X scalar ghost 1 2;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "consistency issue is a warning");
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("undefined template") && s.contains("ghost"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_warns_on_scalar_field_count_mismatch() {
+    // Template `point` has 2 scalar fields; the scalar supplies 3 flat values.
+    let input = "#N struct point float x float y;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar point 1 2 3;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("point") && s.contains("field"),
+        "expected a field-count warning; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_warning_for_consistent_scalar() {
+    let input = "#N struct point float x float y;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar point 10 20;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("template") && !s.contains("field"),
+        "consistent scalar must not warn; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_scalar_with_array_field_counts_flat_only() {
+    // holder has 2 scalar fields (x, y) plus an array field (z). The flat
+    // value block (before the first `\;`) is `5 6` = 2, which matches; the
+    // array element data must NOT be counted toward the scalar field count.
+    let input = "#N struct holder float x float y array z element;\n\
+                 #N struct element float v;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar holder 5 6 \\; 1 \\; 2 \\;;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("field") && !s.contains("undefined template"),
+        "array-field scalar must validate cleanly; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_dangling_warning_for_dollar_template() {
+    // A `$`-scoped template name is realized per-instance; static matching is
+    // unreliable, so it must not produce a false "undefined template" warning.
+    let input = "#N canvas 0 22 450 300 12;\n#X scalar \\$0-foo 1 2;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(!s.contains("undefined template"), "got:\n{s}");
+}

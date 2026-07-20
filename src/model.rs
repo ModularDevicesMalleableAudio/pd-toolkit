@@ -312,6 +312,121 @@ impl Entry {
     }
 }
 
+// Data-structure templates and scalars
+
+/// The type of a `#N struct` template field (Pd `g_template.c`:
+/// DT_FLOAT / DT_SYMBOL / DT_TEXT / DT_ARRAY; the legacy `list` type name maps
+/// to `Text`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemplateFieldType {
+    Float,
+    Symbol,
+    Text,
+    Array,
+}
+
+/// A single field of a `#N struct` data-structure template.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplateField {
+    pub field_type: TemplateFieldType,
+    pub name: String,
+    /// Element sub-template name for an `array` field; `None` otherwise.
+    pub array_template: Option<String>,
+}
+
+/// A parsed `#N struct` template: its name and typed fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Template {
+    pub name: String,
+    pub fields: Vec<TemplateField>,
+}
+
+impl Template {
+    /// Number of scalar (flat) fields — `float` and `symbol`. This is the count
+    /// of values a `#X scalar` for this template carries before its first `\;`
+    /// separator; `array`/`text` fields are stored separately and don't count.
+    #[must_use]
+    pub fn scalar_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|f| matches!(f.field_type, TemplateFieldType::Float | TemplateFieldType::Symbol))
+            .count()
+    }
+}
+
+/// Strip exactly one trailing entry terminator `;` (preserving any escaped
+/// `\;`), after trimming trailing whitespace/newlines.
+fn strip_terminator(raw: &str) -> &str {
+    let t = raw.trim_end();
+    t.strip_suffix(';').unwrap_or(t)
+}
+
+/// Parse a `#N struct` template definition into its name and typed fields.
+/// Returns `None` for any other entry.
+#[must_use]
+pub fn parse_struct(raw: &str) -> Option<Template> {
+    let toks: Vec<&str> = strip_terminator(raw).split_whitespace().collect();
+    if toks.len() < 3 || toks[0] != "#N" || toks[1] != "struct" {
+        return None;
+    }
+    let name = toks[2].to_string();
+    let mut fields = Vec::new();
+    let mut i = 3;
+    while i < toks.len() {
+        match toks[i] {
+            "float" | "symbol" | "text" | "list" => {
+                let Some(fname) = toks.get(i + 1) else { break };
+                let field_type = match toks[i] {
+                    "float" => TemplateFieldType::Float,
+                    "symbol" => TemplateFieldType::Symbol,
+                    _ => TemplateFieldType::Text,
+                };
+                fields.push(TemplateField {
+                    field_type,
+                    name: (*fname).to_string(),
+                    array_template: None,
+                });
+                i += 2;
+            }
+            // `array <name> <element-template>` (Pd g_template.c).
+            "array" => {
+                let Some(fname) = toks.get(i + 1) else { break };
+                fields.push(TemplateField {
+                    field_type: TemplateFieldType::Array,
+                    name: (*fname).to_string(),
+                    array_template: toks.get(i + 2).map(|s| (*s).to_string()),
+                });
+                i += 3;
+            }
+            // Unknown type token: skip defensively rather than misparse.
+            _ => i += 1,
+        }
+    }
+    Some(Template { name, fields })
+}
+
+/// Parse a `#X scalar` entry into `(template_name, flat_values)`.
+///
+/// The flat values are the atoms before the first `\;` separator — Pd writes a
+/// scalar's `float`/`symbol` fields there, with `array`/`text` data following
+/// after `\;`. Returns `None` for any other entry.
+#[must_use]
+pub fn parse_scalar(raw: &str) -> Option<(String, Vec<String>)> {
+    let toks: Vec<&str> = strip_terminator(raw).split_whitespace().collect();
+    if toks.len() < 3 || toks[0] != "#X" || toks[1] != "scalar" {
+        return None;
+    }
+    let name = toks[2].to_string();
+    let mut flat = Vec::new();
+    for &t in &toks[3..] {
+        if t == r"\;" {
+            break;
+        }
+        flat.push(t.to_string());
+    }
+    Some((name, flat))
+}
+
 // Connection
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -567,6 +682,63 @@ mod tests {
     fn message_targets_ignores_non_message_entries() {
         assert!(message_send_targets(r"#X obj 10 10 s foo;").is_empty());
         assert!(message_send_targets(r"#X text 10 10 \; not a send;").is_empty());
+    }
+
+    #[test]
+    fn parse_struct_typed_fields() {
+        let t = parse_struct("#N struct point float x float y symbol name;").unwrap();
+        assert_eq!(t.name, "point");
+        assert_eq!(t.fields.len(), 3);
+        assert_eq!(t.fields[0].field_type, TemplateFieldType::Float);
+        assert_eq!(t.fields[0].name, "x");
+        assert_eq!(t.fields[2].field_type, TemplateFieldType::Symbol);
+        assert_eq!(t.scalar_field_count(), 3);
+    }
+
+    #[test]
+    fn parse_struct_array_field_has_subtemplate_and_is_not_scalar_field() {
+        let t = parse_struct("#N struct holder float x float y array z element;").unwrap();
+        assert_eq!(t.fields.len(), 3);
+        let arr = &t.fields[2];
+        assert_eq!(arr.field_type, TemplateFieldType::Array);
+        assert_eq!(arr.name, "z");
+        assert_eq!(arr.array_template.as_deref(), Some("element"));
+        // Array/text fields do not count toward the scalar (flat) field count.
+        assert_eq!(t.scalar_field_count(), 2);
+    }
+
+    #[test]
+    fn parse_struct_rejects_non_struct() {
+        assert!(parse_struct("#N canvas 0 22 450 300 12;").is_none());
+        assert!(parse_struct("#X obj 10 10 struct foo;").is_none());
+    }
+
+    #[test]
+    fn parse_scalar_flat_values_stop_at_first_escaped_semi() {
+        // Real inline scalar: flat fields, then `\;`-separated array data.
+        let (tmpl, flat) = parse_scalar(r"#X scalar holder 5 6 \; 1 \; 2 \;;").unwrap();
+        assert_eq!(tmpl, "holder");
+        assert_eq!(flat, vec!["5", "6"]);
+    }
+
+    #[test]
+    fn parse_scalar_without_array_data() {
+        let (tmpl, flat) = parse_scalar("#X scalar point 10 20;").unwrap();
+        assert_eq!(tmpl, "point");
+        assert_eq!(flat, vec!["10", "20"]);
+    }
+
+    #[test]
+    fn parse_scalar_single_field_with_trailing_escaped_semi() {
+        // Matches a real single-field data-structure patch shape.
+        let (tmpl, flat) = parse_scalar(r"#X scalar 1017-DS-1 66.6 \;;").unwrap();
+        assert_eq!(tmpl, "1017-DS-1");
+        assert_eq!(flat, vec!["66.6"]);
+    }
+
+    #[test]
+    fn parse_scalar_rejects_non_scalar() {
+        assert!(parse_scalar("#X obj 10 10 print;").is_none());
     }
 
     #[test]

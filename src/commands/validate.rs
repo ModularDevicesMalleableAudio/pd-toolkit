@@ -1,7 +1,7 @@
 use crate::errors::PdtkError;
 use crate::types::signatures::{inlet_count, outlet_count};
 use pdtk::{
-    model::{Connection, EntryKind},
+    model::{Connection, EntryKind, parse_scalar, parse_struct},
     parser::{escape::has_unescaped_dollar_digit, parse},
 };
 use serde::Serialize;
@@ -209,6 +209,42 @@ pub fn run(
                 "entry {i}: stray content (likely an unescaped ';' in a preceding message body — use \\;): {}",
                 entry.raw.trim()
             ));
+        }
+    }
+
+    // 4c) Data-structure consistency (warnings, mirroring Pd's load-time
+    //     diagnostics): a `#X scalar` must reference a defined `#N struct`,
+    //     and supply exactly as many flat values as the template has scalar
+    //     (float/symbol) fields. Templates are patch-global in Pd, so collect
+    //     them across all depths.
+    let mut templates: HashMap<String, usize> = HashMap::new();
+    for e in &patch.entries {
+        if e.kind == EntryKind::Struct
+            && let Some(t) = parse_struct(&e.raw)
+        {
+            templates.insert(t.name.clone(), t.scalar_field_count());
+        }
+    }
+    for e in &patch.entries {
+        if e.kind != EntryKind::Scalar {
+            continue;
+        }
+        let Some((tmpl, flat)) = parse_scalar(&e.raw) else {
+            continue;
+        };
+        let user_depth = e.depth.saturating_sub(1);
+        match templates.get(&tmpl) {
+            // A `$`-scoped template name is realized per-instance; static
+            // matching is unreliable, so don't claim it is undefined.
+            None if !tmpl.contains('$') => warnings.push(format!(
+                "depth {user_depth}: scalar references undefined template '{tmpl}' (no matching #N struct)"
+            )),
+            Some(&nfields) if flat.len() != nfields => warnings.push(format!(
+                "depth {user_depth}: scalar '{tmpl}' has {} value(s) but template defines {} scalar field(s)",
+                flat.len(),
+                nfields
+            )),
+            _ => {}
         }
     }
 

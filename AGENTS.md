@@ -161,6 +161,15 @@ means pdtk cannot open real data-structure patches at all — many real-world
 patches (both help files and abstractions) begin with one or more `#N struct`
 definitions.
 
+`model::parse_struct` / `parse_scalar` decode these entries (a template's typed
+fields; a scalar's `(template, flat_values)`, where flat values stop at the
+first `\;` separator — inline scalar array data is `\;`-escaped, so a scalar is
+a single entry, never bare data lines). `validate` uses them to warn on a
+scalar referencing an undefined template or a scalar/template field-count
+mismatch (mirroring Pd's load-time errors), and the `structs` command lists
+templates and scalars. `$`-scoped template names are skipped by the dangling
+check (realized per-instance, so static matching is unreliable).
+
 ### `#X restore` depth rule
 
 `#X restore` **closes** the current subpatch depth and is assigned an index at the **parent** depth. The depth stack must be decremented before assigning the index.

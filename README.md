@@ -75,11 +75,12 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 |---|---|---|
 | **Inspection** | `parse` | Object count, connection count, depth, warnings |
 | | `list` | List every indexed object with address and class |
-| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects). `--strict` also warns on duplicate connections |
+| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects), and on data-structure inconsistencies (a `#X scalar` with no matching `#N struct`, or a scalar/template field-count mismatch). `--strict` also warns on duplicate connections |
 | | `lint` | Validate + layout overlap detection. Opt-in heuristics: `--send-receive`, `--fan-out`, `--dsp-loop` (see [Lint checks](#lint-checks)) |
 | | `stats` | Per-file metrics: fan-in/out, class histogram, orphans. Aggregates across all files in directory mode |
 | | `connections` | List all patch cords to/from one object |
 | | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, duplicate detection. `--kind classic\|define\|all`, `--templates include\|exclude\|only`, `--schema 1\|2` |
+| | `structs` | List data-structure templates (`#N struct`) with typed fields and scalars (`#X scalar`) with template + value count. Flags scalars whose template is undefined. File or directory, `--json` |
 | **Search** | `search` | Find objects by class (`--type`) and/or text (`--text`, glob by default, `--regex` for regex). `--case-sensitive`, `--depth` |
 | | `find-orphans` | Objects with zero connections. `--delete --in-place` removes them; `--include-comments` includes `#X text` |
 | | `find-displays` | Connected debug display widgets (floatatom/symbolatom/nbx/vu). `--include-unconnected`, `--include-labels`, `--delete` |

@@ -17,6 +17,7 @@ COMMANDS BY CATEGORY
     stats         Patch complexity metrics
     connections   List all connections to/from a specific object
     arrays        List all PD arrays defined in patches
+    structs       List data-structure templates and scalars
 
   Search & Analysis:
     search        Find objects by class name or text pattern
@@ -220,6 +221,25 @@ pub enum Commands {
             help = "Nth sibling subpatch at this depth (default 0)"
         )]
         canvas: usize,
+        /// Output results as JSON
+        #[arg(long, help = "Output results as JSON")]
+        json: bool,
+    },
+
+    /// List data-structure templates (#N struct) and scalars (#X scalar)
+    #[command(
+        long_about = "Scan one file or a directory tree for Pure Data data-structure\n\
+                      definitions and report each `#N struct` template (with its typed\n\
+                      fields) and each `#X scalar` instance (with its template, flat\n\
+                      value count, and [depth:index]). A scalar whose template has no\n\
+                      matching `#N struct` in the same file is flagged 'undefined\n\
+                      template'.",
+        after_long_help = "EXAMPLES:\n    pdtk structs patch.pd\n    \
+                           pdtk structs src/ --json | jq '.[].templates'"
+    )]
+    Structs {
+        /// File or directory to scan
+        target: String,
         /// Output results as JSON
         #[arg(long, help = "Output results as JSON")]
         json: bool,
