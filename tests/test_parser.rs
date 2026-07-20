@@ -588,7 +588,7 @@ fn roundtrip_all_handcrafted_fixtures() {
     let dir = helpers::fixtures_dir().join("handcrafted");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             // empty_file.pd is intentionally invalid — skip round-trip
             if name == "empty_file.pd" {
@@ -604,7 +604,7 @@ fn roundtrip_all_corpus_files() {
     let dir = helpers::fixtures_dir().join("corpus");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             assert_roundtrip(&name, path);
         }
@@ -618,7 +618,7 @@ fn parse_all_corpus_files_no_error() {
     let dir = helpers::fixtures_dir().join("corpus");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_some_and(|e| e == "pd") {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             let input = read_fixture(&path);
             parse(&input).unwrap_or_else(|e| panic!("parse failed for {name}: {e}"));

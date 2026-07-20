@@ -502,7 +502,7 @@ fn deps_expanded_builtins_not_missing() {
         "stripnote",
     ] {
         assert!(
-            !out.contains(&format!("{} (MISSING", name)),
+            !out.contains(&format!("{name} (MISSING")),
             "core builtin {name} should not be MISSING. output: {out}"
         );
     }

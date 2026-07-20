@@ -11,7 +11,7 @@ fn count_pd_files(dir: &PathBuf) -> usize {
     std::fs::read_dir(dir)
         .unwrap()
         .filter_map(Result::ok)
-        .filter(|e| e.path().extension().map(|x| x == "pd").unwrap_or(false))
+        .filter(|e| e.path().extension().is_some_and(|x| x == "pd"))
         .count()
 }
 

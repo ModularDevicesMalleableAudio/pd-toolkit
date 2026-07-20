@@ -5,7 +5,7 @@ use integration::{fixture_path, handcrafted, pdtk_output, run_pdtk, stdout_strin
 fn connections_from(text: &str) -> Vec<String> {
     text.lines()
         .filter(|l| l.trim_start().starts_with("#X connect"))
-        .map(|l| l.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect()
 }
 
@@ -144,7 +144,7 @@ fn format_all_corpus_files_connections_preserved() {
     let corpus = fixture_path("corpus");
     for entry in std::fs::read_dir(&corpus).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let original = std::fs::read_to_string(&path).unwrap();
@@ -165,7 +165,7 @@ fn format_pd_else_corpus_connections_preserved() {
     let corpus = fixture_path("pd_else");
     for entry in std::fs::read_dir(&corpus).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let original = std::fs::read_to_string(&path).unwrap();

@@ -98,7 +98,7 @@ fn parse_output_flag_round_trips_corpus_files() {
     let dir = integration::fixture_path("corpus");
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();

@@ -41,7 +41,7 @@ fn validate_all_corpus_files_exit_0() {
     let dir = corpus_dir();
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
-        if !path.extension().map(|e| e == "pd").unwrap_or(false) {
+        if path.extension().is_none_or(|e| e != "pd") {
             continue;
         }
 
@@ -149,7 +149,7 @@ fn validate_json_output_includes_error_list() {
     assert_eq!(out.status.code(), Some(1));
     let json: serde_json::Value = serde_json::from_str(&stdout_string(&out)).unwrap();
     assert_eq!(json["valid"], false);
-    assert!(json["errors"].as_array().unwrap().len() >= 1);
+    assert!(!json["errors"].as_array().unwrap().is_empty());
 }
 
 #[test]
