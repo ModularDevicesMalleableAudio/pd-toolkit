@@ -114,6 +114,45 @@ pub fn vu_receive_arg_index() -> usize {
     2
 }
 
+/// Extract the named send targets embedded in a `#X msg` entry.
+///
+/// A PD message box may contain sub-messages separated by an escaped `\;`.
+/// Each `\;`-introduced sub-message is delivered to the named receiver given
+/// by its first token (e.g. `\; pitch 60` sends `60` to receiver `pitch`).
+/// This is PD's standard state-broadcast idiom and is otherwise invisible to
+/// send/receive analysis and `rename-send`.
+///
+/// Returns `(token_position, name)` pairs, where `token_position` is the index
+/// into `raw.split_whitespace()` of the target token (so callers can rewrite
+/// it in place). The returned `name` has any trailing `;`/`,` stripped. The
+/// leading sub-message (before the first `\;`) is emitted from the box's
+/// outlet, not to a named receiver, so it is never a target.
+///
+/// Returns an empty vec for non-message entries.
+#[must_use]
+pub fn message_send_targets(raw: &str) -> Vec<(usize, String)> {
+    let tokens: Vec<&str> = raw.split_whitespace().collect();
+    if tokens.len() < 5 || tokens[0] != "#X" || tokens[1] != "msg" {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    // Content tokens start after `#X msg X Y`.
+    let mut i = 4;
+    while i < tokens.len() {
+        if tokens[i] == r"\;" {
+            if let Some(&next) = tokens.get(i + 1) {
+                let name = next.trim_end_matches([';', ',']);
+                // Skip empties and further separators.
+                if !name.is_empty() && name != r"\;" && name != r"\," {
+                    out.push((i + 1, name.to_string()));
+                }
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
 fn is_empty_name(s: &str) -> bool {
     s == "empty" || s == "-"
 }
@@ -494,5 +533,49 @@ mod tests {
         assert_eq!(trailing_width_hint("t b b b b, f 200"), Some(200));
         assert_eq!(trailing_width_hint("t b b b b"), None);
         assert_eq!(content_without_width_hint("t b b b b, f 200"), "t b b b b");
+    }
+
+    #[test]
+    fn message_targets_single_leading_send() {
+        // `\;`-introduced sub-message: target is `pitch`.
+        let t = message_send_targets(r"#X msg 19 89 \; pitch 60;");
+        assert_eq!(t, vec![(5, "pitch".to_string())]);
+    }
+
+    #[test]
+    fn message_targets_multiple_sends() {
+        let t = message_send_targets(r"#X msg 10 10 \; pitch 60 \; velocity 100 \; gate 1;");
+        let names: Vec<&str> = t.iter().map(|(_, n)| n.as_str()).collect();
+        assert_eq!(names, vec!["pitch", "velocity", "gate"]);
+    }
+
+    #[test]
+    fn message_targets_leading_outlet_message_is_not_a_target() {
+        // `set 1` goes out the box outlet; only `foo` (after `\;`) is a target.
+        let t = message_send_targets(r"#X msg 10 10 set 1 \; foo 2;");
+        assert_eq!(t, vec![(7, "foo".to_string())]);
+    }
+
+    #[test]
+    fn message_targets_none_without_escaped_semicolon() {
+        assert!(message_send_targets("#X msg 10 10 bang;").is_empty());
+    }
+
+    #[test]
+    fn message_targets_ignores_non_message_entries() {
+        assert!(message_send_targets(r"#X obj 10 10 s foo;").is_empty());
+        assert!(message_send_targets(r"#X text 10 10 \; not a send;").is_empty());
+    }
+
+    #[test]
+    fn message_targets_position_is_whitespace_token_index() {
+        // Position must index into split_whitespace() so callers can rewrite it.
+        let raw = r"#X msg 19 89 \; 01_arrays read foo.mseq;";
+        let t = message_send_targets(raw);
+        assert_eq!(t.len(), 1);
+        let (pos, name) = &t[0];
+        assert_eq!(name, "01_arrays");
+        let toks: Vec<&str> = raw.split_whitespace().collect();
+        assert_eq!(toks[*pos], "01_arrays");
     }
 }

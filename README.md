@@ -93,7 +93,7 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 | | `connect` | Add a patch cord (refuses duplicates and out-of-range) |
 | | `disconnect` | Remove a specific patch cord |
 | | `renumber` | Manually shift connection indices by a delta |
-| | `rename-send` | Rename s/r pairs atomically across files, including GUI fields. `--dry-run`, `--force` (override target-exists check) |
+| | `rename-send` | Rename s/r pairs atomically across files, including GUI fields and named send targets inside message boxes (`\; name ...`). `--dry-run`, `--force` (override target-exists check) |
 | **Layout** | `format` | Auto-reposition objects (connections byte-identical). `--grid`, `--hpad`, `--margin`, `--depth`, `--dry-run` |
 | **Subpatch** | `extract` | Extract subpatch into standalone abstraction. Inlet/outlet count inferred from connections crossing the boundary |
 | **Utilities** | `batch` | Apply any command recursively across `.pd` files. `--glob`, `--continue-on-error`, `--dry-run` |
@@ -111,14 +111,19 @@ command also has a man page (see [Man pages](#man-pages)).
 pdtk models PD's three disjoint bus namespaces — they share names but never
 route to each other at runtime:
 
-| Namespace   | Senders                          | Receivers              |
-|-------------|----------------------------------|------------------------|
-| `control`   | `s` / `send` + GUI send fields   | `r` / `receive`        |
-| `signal`    | `s~` / `send~`                   | `r~` / `receive~`      |
-| `audio_sum` | `throw~` (sums into one `catch~`)| `catch~`               |
+| Namespace   | Senders                                      | Receivers              |
+|-------------|----------------------------------------------|------------------------|
+| `control`   | `s` / `send`, GUI send fields, message-box `\; name` targets | `r` / `receive`        |
+| `signal`    | `s~` / `send~`                               | `r~` / `receive~`      |
+| `audio_sum` | `throw~` (sums into one `catch~`)            | `catch~`               |
 
 `trace --show-bus-hops` and `deps --buses` follow bus connections respecting
 this split. A `[s foo]` and `[s~ foo]` are never reported as connected.
+
+Message boxes drive named receivers via PD's `\;`-send idiom
+(`#X msg ... \; pitch 60;` sends `60` to `[r pitch]`). These count as control
+senders in bus analysis and are rewritten by `rename-send`. Engine/canvas
+targets (`pd`, `pd-<name>`) are excluded to avoid false orphans.
 
 ```
 $ pdtk trace patch.pd --from 0 --show-bus-hops

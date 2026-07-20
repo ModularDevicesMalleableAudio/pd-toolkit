@@ -274,4 +274,5 @@ git diff tests/fixtures/
 7. **Multi-line entries** — a single entry may span physical lines; continuation lines are joined until an unescaped `;` terminator is reached (Pd inserts no column wrapping, only a newline after each real `;`).
 8. **`, f N` at end of an entry** — this is an inline width hint, NOT part of the object class or arguments
 9. **`f` as an object class** — `#X obj 50 50 f;` is a float box. Don't confuse with width hints.
+10. **Message boxes are senders too** — a `\;`-introduced sub-message targets a named receiver (`#X msg ... \; pitch 60;` sends to `[r pitch]`). The first token after each `\;` is the target; the leading (pre-`\;`) message goes out the box outlet and is NOT a target. Send/receive analysis (`send_receive::collect_sends`) and `rename-send` both handle these via `model::message_send_targets`. Engine/canvas targets (`pd`, `pd-<name>`) are excluded from bus analysis but still renamable. Missing these silently breaks `rename-send`.
 

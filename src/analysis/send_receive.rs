@@ -1,4 +1,6 @@
-use crate::model::{Entry, EntryKind, gui_send_receive_arg_indices, vu_receive_arg_index};
+use crate::model::{
+    Entry, EntryKind, gui_send_receive_arg_indices, message_send_targets, vu_receive_arg_index,
+};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -135,6 +137,18 @@ pub fn collect_sends(entries: &[Entry]) -> BTreeMap<BusKey, Vec<Location>> {
                     maybe_insert(&mut out, BusKind::Control, tok.trim_end_matches(';'), loc);
                 }
             }
+            EntryKind::Msg => {
+                // Message boxes send to named receivers via `\;`-introduced
+                // sub-messages. These always carry control messages. Engine /
+                // canvas control targets (`pd`, `pd-<name>`) are not user buses
+                // and would only create false orphan-send noise, so skip them.
+                for (_pos, name) in message_send_targets(&e.raw) {
+                    if name == "pd" || name.starts_with("pd-") {
+                        continue;
+                    }
+                    maybe_insert(&mut out, BusKind::Control, &name, loc);
+                }
+            }
             _ => {}
         }
     }
@@ -197,4 +211,65 @@ pub fn format_locations(locs: &[Location]) -> String {
         .map(|l| format!("[{}:{}]", l.depth, l.index))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse;
+
+    fn keys(map: &BTreeMap<BusKey, Vec<Location>>) -> Vec<(BusKind, String)> {
+        map.keys().cloned().collect()
+    }
+
+    #[test]
+    fn collect_sends_includes_message_box_targets() {
+        // A message box driving [r pitch] via `\; pitch 60` is a real sender,
+        // matched to the `[r]` on the control bus.
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X msg 10 10 \\; pitch 60 \\; velocity 100;\n\
+                     #X obj 10 60 r pitch;\n";
+        let patch = parse(input).unwrap();
+        let sends = collect_sends(&patch.entries);
+        assert!(sends.contains_key(&(BusKind::Control, "pitch".to_string())));
+        assert!(sends.contains_key(&(BusKind::Control, "velocity".to_string())));
+        // The message box's outlet message is not a named send.
+        assert_eq!(sends.len(), 2);
+    }
+
+    #[test]
+    fn collect_sends_skips_engine_message_targets() {
+        // `pd`/`pd-<name>` are engine/canvas control receivers, not user buses.
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X msg 10 10 \\; pd dsp 1;\n\
+                     #X msg 10 40 \\; pd-sub clear;\n\
+                     #X msg 10 70 \\; realbus go;\n";
+        let patch = parse(input).unwrap();
+        let sends = collect_sends(&patch.entries);
+        assert_eq!(
+            keys(&sends),
+            vec![(BusKind::Control, "realbus".to_string())]
+        );
+    }
+
+    #[test]
+    fn collect_sends_message_target_matches_object_send() {
+        // Both a `[s foo]` object and a `\; foo` message contribute to `foo`.
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X obj 10 10 s foo;\n\
+                     #X msg 10 40 \\; foo 1;\n";
+        let patch = parse(input).unwrap();
+        let sends = collect_sends(&patch.entries);
+        let locs = &sends[&(BusKind::Control, "foo".to_string())];
+        assert_eq!(locs.len(), 2, "object send + message send both counted");
+    }
+
+    #[test]
+    fn collect_receives_ignores_message_boxes() {
+        // Message boxes only send; they never receive on a named bus.
+        let input = "#N canvas 0 22 450 300 12;\n\
+                     #X msg 10 10 \\; foo 1;\n";
+        let patch = parse(input).unwrap();
+        assert!(collect_receives(&patch.entries).is_empty());
+    }
 }
