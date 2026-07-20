@@ -152,8 +152,7 @@ pub fn run(
                     ));
                 }
             } else if class != "pd"
-                && let Some((ins, _)) =
-                    abstraction_io_cached(&mut abs_io, class, file_path, &input)
+                && let Some((ins, _)) = abstraction_io_cached(&mut abs_io, class, file_path, &input)
                 && conn.dst_inlet >= ins
             {
                 warnings.push(format!(

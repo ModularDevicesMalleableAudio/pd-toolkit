@@ -349,7 +349,12 @@ impl Template {
     pub fn scalar_field_count(&self) -> usize {
         self.fields
             .iter()
-            .filter(|f| matches!(f.field_type, TemplateFieldType::Float | TemplateFieldType::Symbol))
+            .filter(|f| {
+                matches!(
+                    f.field_type,
+                    TemplateFieldType::Float | TemplateFieldType::Symbol
+                )
+            })
             .count()
     }
 }
