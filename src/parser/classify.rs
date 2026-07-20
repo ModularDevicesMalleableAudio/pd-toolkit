@@ -8,6 +8,13 @@ pub fn classify_entry(raw: &str) -> EntryKind {
         return EntryKind::CanvasOpen;
     }
 
+    // `#N struct` is a data-structure template definition. It is NOT a canvas
+    // and NOT a gobj (it takes no connect index), and may legally precede the
+    // root `#N canvas` in a file.
+    if trimmed.starts_with("#N struct ") {
+        return EntryKind::Struct;
+    }
+
     if trimmed.starts_with("#A ") {
         return EntryKind::ArrayData;
     }
@@ -178,6 +185,20 @@ mod tests {
     #[test]
     fn classify_c_entry() {
         assert_eq!(classify_entry("#C restore;"), EntryKind::Unknown);
+    }
+
+    #[test]
+    fn classify_struct() {
+        // `#N struct` is a data-structure template definition, distinct from
+        // `#N canvas`. It may appear before the root canvas in a file.
+        assert_eq!(
+            classify_entry("#N struct point float x float y;"),
+            EntryKind::Struct
+        );
+        assert_eq!(
+            classify_entry("#N struct holder float x array data element;"),
+            EntryKind::Struct
+        );
     }
 
     #[test]

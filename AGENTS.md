@@ -141,12 +141,25 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 | Entry type | Example | Why |
 |---|---|---|
 | `#N canvas` | `#N canvas 0 22 450 300 12;` | Canvas header |
+| `#N struct` | `#N struct point float x float y;` | Data-structure template definition (not a gobj) |
 | `#X connect` | `#X connect 0 0 1 0;` | Connection reference |
 | `#X coords` | `#X coords 0 7 16 0 200 140 1 0 0;` | Graph config |
 | `#X declare` | `#X declare -path pos_abs;` | Standalone directive |
 | `#X f` | `#X f 115;` | Width hint for preceding object |
 | `#A` | `#A 0 0 0 0;` | Array data |
 | `#C` | `#C restore;` | Non-standard/corrupted |
+
+### Templates before the root canvas (`#N struct`)
+
+A file may begin with one or more `#N struct` template definitions **before**
+the root `#N canvas` (Pd's `canvas_savetemplatesto`). `parse` therefore does
+not require the first entry to be `#N canvas`; it requires that a `#N canvas`
+exists and that every entry preceding it is a `#N struct`. A `#N struct` is
+`EntryKind::Struct`, is not a gobj (no connect index), and lives at whatever
+depth it appears (depth 0 when before the root canvas). Getting this wrong
+means pdtk cannot open real data-structure patches at all — many real-world
+patches (both help files and abstractions) begin with one or more `#N struct`
+definitions.
 
 ### `#X restore` depth rule
 

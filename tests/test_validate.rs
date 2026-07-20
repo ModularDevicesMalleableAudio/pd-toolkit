@@ -504,3 +504,24 @@ fn validate_no_arity_warning_for_unresolvable_external() {
         "unresolvable external must not warn; got:\n{s}"
     );
 }
+
+#[test]
+fn validate_no_stray_warning_for_inline_scalar_data() {
+    // Real inline scalars are a SINGLE `\;`-escaped entry (Pd escapes the
+    // internal separators), not bare data lines. So a data-structure patch
+    // has no bare fragments and the stray-fragment check must stay silent.
+    let input = "#N struct holder float x float y array z element;\n\
+                 #N struct element float v;\n\
+                 #N canvas 0 22 450 300 12;\n\
+                 #X scalar holder 5 6 \\; 1 \\; 2 \\;;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("stray content"),
+        "inline scalar data is one entry, not a stray fragment; got:\n{s}"
+    );
+}

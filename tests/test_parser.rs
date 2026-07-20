@@ -323,6 +323,82 @@ fn parse_missing_canvas_header_returns_error() {
     assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
 }
 
+// D0: data-structure patches may begin with one or more `#N struct` template
+// definitions before the root `#N canvas` (as real Pd saves them). These must
+// parse, with the struct(s) recognised but not indexed.
+
+#[test]
+fn struct_before_canvas_parses() {
+    let patch = parse_fixture("struct_before_canvas.pd");
+    // loadbang(0), scalar(1), print(2) — the leading struct is not an object.
+    assert_eq!(patch.object_count_at_depth(0), 3);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "scalar");
+    assert_eq!(patch.object_at(0, 2).unwrap().class(), "print");
+    let conns = patch.connections_at_depth(0);
+    assert!(conns.iter().any(|c| c.src == 0 && c.dst == 2));
+
+    // The leading struct is recognised and carries no object index.
+    let st = patch
+        .entries
+        .iter()
+        .find(|e| e.raw.starts_with("#N struct"))
+        .expect("struct entry present");
+    assert_eq!(st.kind, EntryKind::Struct);
+    assert_eq!(st.object_index, None);
+}
+
+#[test]
+fn multi_struct_before_canvas_parses() {
+    let patch = parse_fixture("multi_struct_before_canvas.pd");
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    assert_eq!(patch.object_at(0, 0).unwrap().class(), "loadbang");
+    assert_eq!(patch.object_at(0, 1).unwrap().class(), "print");
+    assert!(
+        patch
+            .connections_at_depth(0)
+            .iter()
+            .any(|c| c.src == 0 && c.dst == 1)
+    );
+    // Both leading structs are recognised, neither indexed.
+    let structs: Vec<_> = patch
+        .entries
+        .iter()
+        .filter(|e| e.kind == EntryKind::Struct)
+        .collect();
+    assert_eq!(structs.len(), 2);
+    assert!(structs.iter().all(|e| e.object_index.is_none()));
+}
+
+#[test]
+fn struct_after_canvas_still_parses() {
+    // Regression: a `#N struct` inside the root canvas (the layout that
+    // already parsed) must keep working and remain a non-indexed Struct.
+    let patch = parse_fixture("struct_after_canvas.pd");
+    assert_eq!(patch.object_count_at_depth(0), 2);
+    let st = patch
+        .entries
+        .iter()
+        .find(|e| e.kind == EntryKind::Struct)
+        .expect("struct entry present");
+    assert_eq!(st.object_index, None);
+}
+
+#[test]
+fn parse_struct_without_any_canvas_errors() {
+    // Reject garbage: a file with templates but no root canvas is invalid.
+    let result = parse("#N struct point float x float y;\n");
+    assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
+}
+
+#[test]
+fn parse_nonstruct_before_canvas_errors() {
+    // Only `#N struct` may precede the root canvas; a stray object before it
+    // is still rejected.
+    let result = parse("#X obj 10 10 print;\n#N canvas 0 22 450 300 12;\n");
+    assert_eq!(result.unwrap_err(), ParseError::MissingCanvasHeader);
+}
+
 #[test]
 fn parse_multiline_msg_single_entry() {
     let patch = parse_fixture("multiline_obj.pd");

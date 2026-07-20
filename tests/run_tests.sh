@@ -92,10 +92,13 @@ count_connections() {
     echo "${n:-0}" | tr -d '[:space:]'
 }
 
-# Check if file starts with #N canvas
+# Check if file starts with #N canvas, optionally preceded by one or more
+# #N struct template definitions (valid in data-structure patches).
 starts_with_canvas() {
     local file="$1"
-    head -1 "$file" | grep -q "^#N canvas" 2>/dev/null
+    local first_non_struct
+    first_non_struct=$(grep -m1 -v "^#N struct" "$file" 2>/dev/null)
+    [[ "$first_non_struct" == "#N canvas"* ]]
 }
 
 # Check all entries end with ;

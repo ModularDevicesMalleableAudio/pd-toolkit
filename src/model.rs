@@ -29,6 +29,7 @@ impl From<TokenizeWarning> for ParseWarning {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EntryKind {
     CanvasOpen, // #N canvas
+    Struct,     // #N struct (data-structure template definition)
     Obj,        // #X obj
     Msg,        // #X msg
     Text,       // #X text
@@ -180,6 +181,7 @@ impl Entry {
             EntryKind::Restore => "restore",
             EntryKind::Connect => "connect",
             EntryKind::CanvasOpen => "canvas",
+            EntryKind::Struct => "struct",
             EntryKind::Coords => "coords",
             EntryKind::Array => "array",
             EntryKind::Scalar => "scalar",

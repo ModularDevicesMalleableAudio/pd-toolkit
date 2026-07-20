@@ -22,8 +22,18 @@ pub fn parse(input: &str) -> Result<Patch, ParseError> {
     let tok = tokenize_entries(input);
     let entries = build_entries(&tok.entries);
 
-    if entries.first().map(|e| &e.kind) != Some(&EntryKind::CanvasOpen) {
-        return Err(ParseError::MissingCanvasHeader);
+    // A valid patch contains a root `#N canvas`, but real Pd files may write
+    // one or more `#N struct` data-structure template definitions before it
+    // (see g_readwrite.c canvas_savetemplatesto). Accept leading templates;
+    // reject a file with no canvas, or with any non-template entry before the
+    // root canvas.
+    match entries.iter().position(|e| e.kind == EntryKind::CanvasOpen) {
+        None => return Err(ParseError::MissingCanvasHeader),
+        Some(root) => {
+            if entries[..root].iter().any(|e| e.kind != EntryKind::Struct) {
+                return Err(ParseError::MissingCanvasHeader);
+            }
+        }
     }
 
     let warnings: Vec<ParseWarning> = tok.warnings.into_iter().map(Into::into).collect();
