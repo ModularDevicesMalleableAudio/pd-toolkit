@@ -94,7 +94,10 @@ fn deps_stdlib_declaration_also_suppresses_missing() {
         !out.contains("MISSING"),
         "-stdlib must suppress MISSING: {out}"
     );
-    assert!(out.contains("zexy"), "status should name the library: {out}");
+    assert!(
+        out.contains("zexy"),
+        "status should name the library: {out}"
+    );
 }
 
 #[test]
@@ -133,7 +136,11 @@ fn deps_declared_lib_does_not_suppress_found_abstractions() {
     // reported: used_abs.pd still resolves as found, missing_abs stays
     // unresolved-but-lib-declared (not MISSING).
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("used_abs.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+    std::fs::write(
+        dir.path().join("used_abs.pd"),
+        "#N canvas 0 22 450 300 12;\n",
+    )
+    .unwrap();
     let main = dir.path().join("main.pd");
     std::fs::write(
         &main,
