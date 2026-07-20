@@ -428,7 +428,13 @@ pub enum Commands {
         long_about = "Scan #X obj entries for non-builtin object class names, which are\n\
                       treated as abstraction references. Searches for <name>.pd in the\n\
                       file's own directory and any paths declared with #X declare -path.\n\
-                      --missing shows only abstractions whose file cannot be found.\n\
+                      A class that cannot be located but is covered by a declared library\n\
+                      (#X declare -lib/-stdlib, or an ELSE [import] object) is reported as\n\
+                      'unresolved (library declared)' rather than MISSING, since its\n\
+                      implementation may live inside a monolithic binary that cannot be\n\
+                      introspected. Such classes are excluded from --missing.\n\
+                      --missing shows only abstractions whose file cannot be found and\n\
+                      that no declared library could provide.\n\
                       --recursive follows found abstractions (circular refs are handled).",
         after_long_help = "EXAMPLES:\n    pdtk deps patch.pd\n    \
                            pdtk deps patch.pd --missing\n    \

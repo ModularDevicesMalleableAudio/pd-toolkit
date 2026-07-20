@@ -63,7 +63,10 @@ pub fn run(
     all.retain(|e| seen_pairs.insert((e.file.clone(), e.name.clone())));
 
     if missing_only {
-        all.retain(|e| !e.found);
+        // A class covered by a declared library cannot be confirmed missing,
+        // so it is excluded from --missing (only genuinely unresolvable
+        // classes with no library declared remain).
+        all.retain(|e| !e.found && e.declared_libs.is_empty());
     }
 
     if json {
@@ -76,12 +79,17 @@ pub fn run(
 
     let mut out = String::new();
     for e in &all {
-        let status = match (e.found, e.source) {
-            (_, Some(BuiltinSource::CoreExtra)) => {
-                "core-extra (declare may be required)".to_string()
-            }
-            (true, _) => format!("found:{}", e.found_at.as_deref().unwrap_or("")),
-            (false, _) => "MISSING".to_string(),
+        let status = if matches!(e.source, Some(BuiltinSource::CoreExtra)) {
+            "core-extra (declare may be required)".to_string()
+        } else if e.found {
+            format!("found:{}", e.found_at.as_deref().unwrap_or(""))
+        } else if !e.declared_libs.is_empty() {
+            format!(
+                "unresolved (declared lib: {} — cannot verify)",
+                e.declared_libs.join(", ")
+            )
+        } else {
+            "MISSING".to_string()
         };
         let _ = writeln!(
             out,

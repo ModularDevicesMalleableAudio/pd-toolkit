@@ -195,6 +195,17 @@ loader externals (`.pd_lua`, `.pd_luax`), then abstractions (`.pd`, `.pat`,
 and the `name/name.pd` class-in-folder convention). `deps` mirrors this set;
 checking only `.pd` reports Lua/compiled externals as false `MISSING`.
 
+A `#X declare -lib`/`-stdlib` (and the ELSE `[import]` object) loads a library
+that may register classes living inside a single (monolithic) binary — e.g.
+`-lib zexy` provides `[demux]` with no per-class file. `deps` cannot introspect
+those binaries, so an unresolved class is attributed to any declared library
+(`unresolved (library declared)`) instead of `MISSING`, and excluded from
+`--missing`. Library declarations are collected by `declared_libraries()` and,
+like `-path`, inherited down the abstraction owner chain (Pd loads libraries
+process-globally). This trades recall for precision: a declared library also
+suppresses a genuinely-missing typo, so the class stays listed (just not as
+`MISSING`) for a human to scan.
+
 ## Code Style
 
 - Run `cargo fmt` before committing Rust code; fix all `cargo clippy` warnings

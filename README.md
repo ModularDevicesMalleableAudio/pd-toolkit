@@ -85,7 +85,7 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 | | `find-displays` | Connected debug display widgets (floatatom/symbolatom/nbx/vu). `--include-unconnected`, `--include-labels`, `--delete` |
 | | `trace` | BFS forward trace or path-find. `--show-bus-hops` also follows matching `s`/`r`, `s~`/`r~`, `throw~`/`catch~` pairs within each canvas, respecting the three bus namespaces (see [Send/receive buses](#sendreceive-buses)) |
 | | `diff` | Structural diff (objects added/removed/modified, cords). `--ignore-coords` is the pairing for `format` diffs |
-| | `deps` | Abstraction dependency list. `--missing`, `--recursive`, `--search-path DIR` (repeatable fallback), `--pd-path` (append common external locations), `--buses` (bus pairs by namespace; with `--recursive` reports unsatisfied cross-file contracts), `--per-file` (don't merge bus names across files) |
+| | `deps` | Abstraction dependency list. A class covered by a declared library (`#X declare -lib`/`-stdlib`, or ELSE `[import]`) is reported `unresolved (declared lib: …)` instead of `MISSING` and excluded from `--missing`. `--missing`, `--recursive`, `--search-path DIR` (repeatable fallback), `--pd-path` (append common external locations), `--buses` (bus pairs by namespace; with `--recursive` reports unsatisfied cross-file contracts), `--per-file` (don't merge bus names across files) |
 | **Creation** | `new` | Create a blank `.pd` patch. Defaults match PD's `File > New`: 450×300, font 12, y=22 (macOS) / y=50 (Linux) |
 | **Editing** | `insert` | Insert object, renumber connections automatically |
 | | `delete` | Delete an object (`--index`) or an entire subpatch (`--subpatch`); cords are removed and remaining ones renumbered |

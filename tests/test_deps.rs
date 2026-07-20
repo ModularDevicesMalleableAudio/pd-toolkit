@@ -32,6 +32,151 @@ fn deps_missing_flag_only_shows_absent_files() {
     assert!(!out.contains("used_abs"));
 }
 
+// Option 1: a declared library (`-lib`/`-stdlib`/`import`) means an unknown
+// class is plausibly provided at runtime by a monolithic library that static
+// analysis cannot introspect. Such classes must NOT be reported as MISSING;
+// they get a distinct "unresolved (library declared)" status and are excluded
+// from `--missing`.
+
+fn write_tmp(content: &str) -> tempfile::NamedTempFile {
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), content).unwrap();
+    tmp
+}
+
+#[test]
+fn deps_declared_lib_class_not_reported_missing() {
+    // `-lib cyclone` declared; [coll] has no file on disk but is provided by
+    // the (monolithic) cyclone library at runtime.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    // Still listed so a human can see it...
+    assert!(out.contains("coll"), "class must still be listed: {out}");
+    // ...but not as a hard MISSING.
+    assert!(
+        !out.contains("MISSING"),
+        "declared-lib class must not be MISSING: {out}"
+    );
+    // A distinct status mentioning the declared library.
+    assert!(
+        out.contains("cyclone") && out.to_lowercase().contains("lib"),
+        "status should mention the declared library: {out}"
+    );
+}
+
+#[test]
+fn deps_declared_lib_class_excluded_from_missing_flag() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap(), "--missing"]);
+    assert!(
+        !out.contains("coll"),
+        "--missing must exclude classes covered by a declared library: {out}"
+    );
+}
+
+#[test]
+fn deps_stdlib_declaration_also_suppresses_missing() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -stdlib zexy;\n\
+         #X obj 50 50 demux;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        !out.contains("MISSING"),
+        "-stdlib must suppress MISSING: {out}"
+    );
+    assert!(out.contains("zexy"), "status should name the library: {out}");
+}
+
+#[test]
+fn deps_import_object_declares_library() {
+    // ELSE's [import cyclone] loads the cyclone namespace, so [coll] resolves.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 20 20 import cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        !out.contains("MISSING"),
+        "[import cyclone] must suppress MISSING for coll: {out}"
+    );
+}
+
+#[test]
+fn deps_no_declared_lib_still_missing() {
+    // Regression guard against over-suppression: with NO library declared,
+    // an unresolvable class is still MISSING.
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap()]);
+    assert!(
+        out.contains("coll") && out.contains("MISSING"),
+        "undeclared unresolvable class must remain MISSING: {out}"
+    );
+}
+
+#[test]
+fn deps_declared_lib_does_not_suppress_found_abstractions() {
+    // A declared lib must not change how genuinely-resolvable abstractions are
+    // reported: used_abs.pd still resolves as found, missing_abs stays
+    // unresolved-but-lib-declared (not MISSING).
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("used_abs.pd"), "#N canvas 0 22 450 300 12;\n").unwrap();
+    let main = dir.path().join("main.pd");
+    std::fs::write(
+        &main,
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 used_abs;\n\
+         #X obj 50 100 coll;\n",
+    )
+    .unwrap();
+    let out = pdtk_output(&["deps", main.to_str().unwrap()]);
+    assert!(out.contains("used_abs"), "{out}");
+    assert!(
+        out.contains("found:"),
+        "resolvable abstraction still reported as found: {out}"
+    );
+    assert!(!out.contains("MISSING"), "{out}");
+}
+
+#[test]
+fn deps_declared_lib_json_carries_declared_libs() {
+    let tmp = write_tmp(
+        "#N canvas 0 22 450 300 12;\n\
+         #X declare -lib cyclone;\n\
+         #X obj 50 50 coll;\n",
+    );
+    let out = pdtk_output(&["deps", tmp.path().to_str().unwrap(), "--json"]);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let coll = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["name"] == "coll")
+        .expect("coll entry present in JSON");
+    assert_eq!(coll["found"], serde_json::json!(false));
+    let libs = coll["declared_libs"]
+        .as_array()
+        .expect("declared_libs array present");
+    assert!(
+        libs.iter().any(|l| l == "cyclone"),
+        "declared_libs must contain cyclone: {out}"
+    );
+}
+
 #[test]
 fn deps_recursive_follows_chain() {
     let f = abs_dir().join("uses_abstractions.pd");
