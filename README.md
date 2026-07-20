@@ -75,7 +75,7 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 |---|---|---|
 | **Inspection** | `parse` | Object count, connection count, depth, warnings |
 | | `list` | List every indexed object with address and class |
-| | `validate` | Check connection index ranges and canvas balance. `--strict` also warns on duplicate connections |
+| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects). `--strict` also warns on duplicate connections |
 | | `lint` | Validate + layout overlap detection. Opt-in heuristics: `--send-receive`, `--fan-out`, `--dsp-loop` (see [Lint checks](#lint-checks)) |
 | | `stats` | Per-file metrics: fan-in/out, class histogram, orphans. Aggregates across all files in directory mode |
 | | `connections` | List all patch cords to/from one object |

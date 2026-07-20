@@ -7,6 +7,27 @@ use pdtk::{
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
+use std::path::Path;
+
+/// Memoized `(inlets, outlets)` for an object class resolved as an abstraction
+/// relative to the patch being validated. `None` means "not resolvable as an
+/// introspectable `.pd` abstraction" (unknown external, missing file, etc.) —
+/// in which case no arity check is applied, matching the conservative
+/// never-undercount policy of the builtin signature table.
+fn abstraction_io_cached(
+    cache: &mut HashMap<String, Option<(usize, usize)>>,
+    class: &str,
+    file_path: &Path,
+    content: &str,
+) -> Option<(usize, usize)> {
+    if let Some(cached) = cache.get(class) {
+        return *cached;
+    }
+    let resolved = pdtk::analysis::deps::resolve_abstraction(class, file_path, content)
+        .and_then(|p| pdtk::analysis::deps::abstraction_io_counts(&p));
+    cache.insert(class.to_string(), resolved);
+    resolved
+}
 
 #[derive(Debug)]
 pub struct ValidateResult {
@@ -68,6 +89,9 @@ pub fn run(
 
     // 3) Connection range checks + outlet/inlet arity checks (canvas-scoped)
     let mut seen_by_canvas: HashMap<usize, HashSet<(usize, usize, usize, usize)>> = HashMap::new();
+    // Cache of arity counts for classes resolved as project-local abstractions.
+    let file_path = Path::new(file);
+    let mut abs_io: HashMap<String, Option<(usize, usize)>> = HashMap::new();
     for (i, entry) in patch.entries.iter().enumerate() {
         if entry.kind != EntryKind::Connect {
             continue;
@@ -92,11 +116,20 @@ pub fn run(
             let class = src_obj.class();
             let args = src_obj.args();
             let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            if let Some(n) = outlet_count(class, &args_refs)
-                && conn.src_outlet >= n
+            if let Some(n) = outlet_count(class, &args_refs) {
+                if conn.src_outlet >= n {
+                    warnings.push(format!(
+                        "depth {user_depth}: '{class}' has {n} outlet(s) but connection uses outlet {}",
+                        conn.src_outlet
+                    ));
+                }
+            } else if class != "pd"
+                && let Some((_, outs)) =
+                    abstraction_io_cached(&mut abs_io, class, file_path, &input)
+                && conn.src_outlet >= outs
             {
                 warnings.push(format!(
-                    "depth {user_depth}: '{class}' has {n} outlet(s) but connection uses outlet {}",
+                    "depth {user_depth}: abstraction '{class}' has {outs} outlet(s) but connection uses outlet {}",
                     conn.src_outlet
                 ));
             }
@@ -111,11 +144,20 @@ pub fn run(
             let class = dst_obj.class();
             let args = dst_obj.args();
             let args_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-            if let Some(n) = inlet_count(class, &args_refs)
-                && conn.dst_inlet >= n
+            if let Some(n) = inlet_count(class, &args_refs) {
+                if conn.dst_inlet >= n {
+                    warnings.push(format!(
+                        "depth {user_depth}: '{class}' has {n} inlet(s) but connection uses inlet {}",
+                        conn.dst_inlet
+                    ));
+                }
+            } else if class != "pd"
+                && let Some((ins, _)) =
+                    abstraction_io_cached(&mut abs_io, class, file_path, &input)
+                && conn.dst_inlet >= ins
             {
                 warnings.push(format!(
-                    "depth {user_depth}: '{class}' has {n} inlet(s) but connection uses inlet {}",
+                    "depth {user_depth}: abstraction '{class}' has {ins} inlet(s) but connection uses inlet {}",
                     conn.dst_inlet
                 ));
             }

@@ -379,3 +379,128 @@ fn validate_flags_stray_fragment_from_unescaped_semicolon() {
     assert!(s.contains("stray content"), "got:\n{s}");
     assert!(s.contains("unescaped ';'"), "got:\n{s}");
 }
+
+// Feature B: validate resolves unknown classes as project-local abstractions
+// and checks connection inlet/outlet indices against the abstraction's real
+// I/O count (number of top-level inlet/outlet objects).
+
+/// Write `abs.pd` and `main.pd` into a fresh dir and return the dir + main path.
+fn abstraction_project(abs: &str, main: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("voice.pd"), abs).unwrap();
+    let main_path = dir.path().join("main.pd");
+    std::fs::write(&main_path, main).unwrap();
+    (dir, main_path)
+}
+
+#[test]
+fn validate_warns_on_abstraction_inlet_out_of_range() {
+    // voice.pd has exactly 1 inlet; wiring into inlet 1 is out of range.
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 loadbang;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 0 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "arity mismatch is a warning");
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 inlet(s)") && s.contains("inlet 1"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_warns_on_abstraction_outlet_out_of_range() {
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 voice;\n\
+                #X obj 10 60 print;\n\
+                #X connect 0 2 1 0;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 outlet(s)") && s.contains("outlet 2"),
+        "got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_warning_for_valid_abstraction_connection() {
+    // Two inlets, two outlets: wiring outlet 1 -> inlet 1 is valid.
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #X obj 60 20 inlet;\n\
+               #X obj 20 200 outlet;\n\
+               #X obj 60 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 voice;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 1 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("abstraction"),
+        "valid abstraction wiring must not warn; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_abstraction_arity_counts_top_level_only() {
+    // 1 top-level inlet + 1 inlet nested in a subpatch = arity 1. Wiring
+    // inlet 1 must warn (the nested inlet is not part of the interface).
+    let abs = "#N canvas 0 22 450 300 12;\n\
+               #X obj 20 20 inlet;\n\
+               #N canvas 0 22 200 200 sub 0;\n\
+               #X obj 10 10 inlet;\n\
+               #X restore 100 100 pd sub;\n\
+               #X obj 20 200 outlet;\n";
+    let main = "#N canvas 0 22 450 300 12;\n\
+                #X obj 10 10 loadbang;\n\
+                #X obj 10 60 voice;\n\
+                #X connect 0 0 1 1;\n";
+    let (_dir, main_path) = abstraction_project(abs, main);
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("abstraction 'voice' has 1 inlet(s)"),
+        "nested inlet must not count toward arity; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_no_arity_warning_for_unresolvable_external() {
+    // No sibling file named my_external.pd -> cannot introspect -> no warning
+    // even for a large outlet index (could be a compiled external).
+    let dir = tempfile::tempdir().unwrap();
+    let main_path = dir.path().join("main.pd");
+    std::fs::write(
+        &main_path,
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 10 10 my_external;\n\
+         #X obj 10 60 print;\n\
+         #X connect 0 7 1 0;\n",
+    )
+    .unwrap();
+
+    let out = run_pdtk(&["validate", main_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("outlet") && !s.contains("abstraction"),
+        "unresolvable external must not warn; got:\n{s}"
+    );
+}

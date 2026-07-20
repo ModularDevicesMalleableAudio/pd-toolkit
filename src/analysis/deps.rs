@@ -385,6 +385,49 @@ fn is_patch_file(path: &Path) -> bool {
     )
 }
 
+/// Resolve an object class to a patch (abstraction) file relative to `file`.
+///
+/// Searches the patch's own directory and any `#X declare -path` directories
+/// (matching Pd's own-canvas resolution order), then filters to patch files
+/// (`.pd`/`.pat`) only — compiled and Lua externals cannot be introspected.
+/// `content` is the already-read text of `file` (used to find declares).
+#[must_use]
+pub fn resolve_abstraction(class: &str, file: &Path, content: &str) -> Option<PathBuf> {
+    let base = file.parent().unwrap_or(Path::new("."));
+    let mut dirs = vec![base.to_path_buf()];
+    dirs.extend(declare_paths(file, content));
+    let path = locate_abstraction(class, &dirs)?;
+    is_patch_file(&path).then_some(path)
+}
+
+/// Count an abstraction's top-level inlets and outlets, returning
+/// `(inlets, outlets)`.
+///
+/// An abstraction's control/signal I/O is fixed by the `inlet`/`inlet~` and
+/// `outlet`/`outlet~` objects on its top-level canvas (both rates share one
+/// numbering space in Pd). Only depth-0 objects count — inlet/outlet objects
+/// nested inside the abstraction's own subpatches belong to those subpatches.
+/// Returns `None` if the file cannot be read or parsed.
+#[must_use]
+pub fn abstraction_io_counts(path: &Path) -> Option<(usize, usize)> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let patch = parse(&content).ok()?;
+    let mut inlets = 0usize;
+    let mut outlets = 0usize;
+    for e in &patch.entries {
+        // Top-level objects live at internal depth 1 (user depth 0).
+        if e.kind != EntryKind::Obj || e.depth != 1 {
+            continue;
+        }
+        match e.class() {
+            "inlet" | "inlet~" => inlets += 1,
+            "outlet" | "outlet~" => outlets += 1,
+            _ => {}
+        }
+    }
+    Some((inlets, outlets))
+}
+
 /// Search for an object class's implementation file across `search_dirs`.
 ///
 /// For each directory, tries `name.<ext>` and the `name/name.<ext>`
@@ -560,6 +603,61 @@ mod tests {
         assert_eq!(builtin_source("bob~"), Some(BuiltinSource::CoreExtra));
         assert_eq!(builtin_source("slop~"), Some(BuiltinSource::CoreExtra));
         assert_eq!(builtin_source("definitely_not_a_class"), None);
+    }
+
+    #[test]
+    fn abstraction_io_counts_top_level_only() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("pdtk_io_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("voice.pd");
+        // Two inlets (one control, one signal), one outlet at top level; the
+        // inlet inside the subpatch must NOT be counted.
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(
+            f,
+            "#N canvas 0 22 450 300 12;\n\
+             #X obj 20 20 inlet;\n\
+             #X obj 60 20 inlet~;\n\
+             #X obj 20 200 outlet;\n\
+             #N canvas 0 22 200 200 sub 0;\n\
+             #X obj 10 10 inlet;\n\
+             #X restore 100 100 pd sub;\n"
+        )
+        .unwrap();
+        assert_eq!(abstraction_io_counts(&path), Some((2, 1)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn abstraction_io_counts_missing_file_is_none() {
+        assert_eq!(
+            abstraction_io_counts(Path::new("/nonexistent/does_not_exist.pd")),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_abstraction_finds_sibling_patch() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("pdtk_res_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let caller = dir.join("main.pd");
+        let abs = dir.join("myabs.pd");
+        std::fs::File::create(&abs)
+            .unwrap()
+            .write_all(b"#N canvas 0 22 450 300 12;\n#X obj 20 20 inlet;\n")
+            .unwrap();
+        let content = "#N canvas 0 22 450 300 12;\n#X obj 10 10 myabs;\n";
+        std::fs::File::create(&caller)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+        let resolved = resolve_abstraction("myabs", &caller, content);
+        assert_eq!(resolved.as_deref(), Some(abs.as_path()));
+        // An unknown class resolves to nothing.
+        assert_eq!(resolve_abstraction("nope", &caller, content), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
