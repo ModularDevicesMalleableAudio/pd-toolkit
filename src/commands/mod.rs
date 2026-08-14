@@ -1,3 +1,4 @@
+pub mod array_data;
 pub mod arrays;
 pub mod batch;
 pub mod common;

@@ -249,9 +249,12 @@ pub enum Commands {
     #[command(
         long_about = "Scan one file or an entire directory tree for #X array definitions\n\
                       and report each array's name, size, and source file.\n\
-                      In directory mode, also detects duplicate array names across files.",
+                      In directory mode, also detects duplicate array names across files.\n\
+                      With --data, also dump each array's saved #A contents (only\n\
+                      arrays declared with -k / an odd save flag store contents).",
         after_long_help = "EXAMPLES:\n    pdtk arrays patch.pd\n    \
-                           pdtk arrays src/ --json | jq .arrays"
+                           pdtk arrays src/ --json | jq .arrays\n    \
+                           pdtk arrays patch.pd --kind all --data --json"
     )]
     Arrays {
         /// File or directory to scan
@@ -268,6 +271,31 @@ pub enum Commands {
         /// Pin output schema version
         #[arg(long, value_name = "N", value_parser = ["1", "2"], default_value = "2", help = "Output schema version (1 or 2)")]
         schema: String,
+        /// Include each array's saved #A contents (schema 2 only)
+        #[arg(long, help = "Include each array's saved #A contents")]
+        data: bool,
+    },
+
+    /// Dump the saved contents of one named array
+    #[command(
+        name = "array-data",
+        long_about = "Print the values a patch saves for one named array, one\n\
+                      `<index> <value>` pair per line (or --json).\n\
+                      Contents come from the #A records PD writes for arrays\n\
+                      declared with -k (or an odd classic save flag); an array\n\
+                      that saves nothing is an error, because PD loads it as\n\
+                      all zeros and there is no data to read.",
+        after_long_help = "EXAMPLES:\n    pdtk array-data patch.pd arpnoteselect\n    \
+                           pdtk array-data src/ scale_table --json | jq '.data.values'"
+    )]
+    ArrayData {
+        /// File or directory to scan
+        target: String,
+        /// Array name to dump
+        name: String,
+        /// Output results as JSON
+        #[arg(long, help = "Output results as JSON")]
+        json: bool,
     },
 
     // Search & Analysis

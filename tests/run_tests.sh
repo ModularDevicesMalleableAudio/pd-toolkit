@@ -565,6 +565,39 @@ test_pdtk_integration() {
         fi
     fi
 
+    # array-data / arrays --data
+    local data_fixture="$HANDCRAFTED_DIR/array_saved_data.pd"
+    if [ -f "$data_fixture" ]; then
+        local data_out
+        data_out=$("$pdtk" array-data "$data_fixture" saved_notes 2>&1)
+        if [ "$(echo "$data_out" | tr '\n' ' ')" = "0 0 1 2 2 4 3 5 4 7 5 9 6 11 7 12 " ]; then
+            pass "pdtk array-data dumps saved #A contents"
+        else
+            fail "pdtk array-data saved_notes — unexpected output: $data_out"
+        fi
+
+        # Chunked `#A` records must join into one contiguous array.
+        data_out=$("$pdtk" array-data "$data_fixture" chunked | awk '{printf "%s", $2}')
+        if [ "$data_out" = "123456" ]; then
+            pass "pdtk array-data joins chunked #A records"
+        else
+            fail "pdtk array-data chunked — expected 123456, got $data_out"
+        fi
+
+        # An array that saves nothing must fail loudly, not print nothing.
+        if ! "$pdtk" array-data "$data_fixture" unsaved >/dev/null 2>&1; then
+            pass "pdtk array-data rejects an array with no saved contents"
+        else
+            fail "pdtk array-data unsaved — should have failed"
+        fi
+
+        if "$pdtk" arrays "$data_fixture" --kind all --data 2>/dev/null | grep -q "data: 10 20 30 40"; then
+            pass "pdtk arrays --data includes classic array contents"
+        else
+            fail "pdtk arrays --data — missing classic_saved contents"
+        fi
+    fi
+
     # new
     local tmp_new
     tmp_new=$(mktemp --suffix=.pd)
