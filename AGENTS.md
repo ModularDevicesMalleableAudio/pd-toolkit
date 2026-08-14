@@ -149,6 +149,34 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 | `#A` | `#A 0 0 0 0;` | Array data |
 | `#C` | `#C restore;` | Non-standard/corrupted |
 
+### Saved array contents (`#A`)
+
+`#A <onset> <value>…;` carries an array's saved values. It is not a gobj, but
+it is the only place a patch stores table data, so reading it is what lets a
+patch array be the source of truth for a table duplicated in code.
+
+- **A record binds to the most recently *declared* array** (`#X array` or an
+  `array define`/`array d` object), exactly as Pd's loader does — not to the
+  nearest declaration structurally, and not scoped to a canvas.
+- **The first number after `#A` is an onset, not a value.** Pd writes long
+  arrays as several records, each starting at the index of its first value.
+  Treating the onset as element 0 shifts the whole table by one — the exact
+  mistake a hand-transcribed copy of a table makes.
+- **Only `-k` (or classic `float K` with bit 0 set) arrays save contents.**
+  Everything else loads as zeros; `array-data` therefore errors instead of
+  printing an empty table, so "no data" can never look like "all zeros".
+- **Values past the declared size are discarded**, as Pd does when loading.
+
+The binding rule was verified empirically against Pd 0.54: two declarations
+followed by two `#A` records load as "first array all zeros, second array holds
+the last record". `validate` warns about that shape (`misbound_array_data`),
+because a file written that way silently loses every array's data but one.
+
+`model::parse_array_decl` is the single decoder for "what array does this entry
+declare" (used by both the `arrays` command's row builder and the data
+binding); `analysis::array_data::array_contents` applies the rules above.
+Don't add a second declaration parser.
+
 ### Templates before the root canvas (`#N struct`)
 
 A file may begin with one or more `#N struct` template definitions **before**
@@ -266,6 +294,7 @@ suppresses a genuinely-missing typo, so the class stays listed (just not as
 # ─── Structural validation helpers ───────────────────────────────────
 ```
 - Add docstrings for all public functions and types; keep them concise
+- "Gate" is a noun, not a verb. Don't say something "gates" or is "gated by" a check; say it "checks" or is "checked by" instead.
 
 ## Workflow for Making Changes
 

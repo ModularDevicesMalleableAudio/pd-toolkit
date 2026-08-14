@@ -75,11 +75,12 @@ pdtk batch    src/ --glob 'sequencer/**/*.pd' format --in-place
 |---|---|---|
 | **Inspection** | `parse` | Object count, connection count, depth, warnings |
 | | `list` | List every indexed object with address and class |
-| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects), and on data-structure inconsistencies (a `#X scalar` with no matching `#N struct`, or a scalar/template field-count mismatch). `--strict` also warns on duplicate connections |
+| | `validate` | Check connection index ranges and canvas balance. Warns on out-of-range inlets/outlets, including arity derived from sibling `.pd` abstractions (counts their top-level `inlet`/`outlet` objects), and on data-structure inconsistencies (a `#X scalar` with no matching `#N struct`, or a scalar/template field-count mismatch) and on `#A` array data PD will not load as written (records overwriting one array, or overflowing its size). `--strict` also warns on duplicate connections |
 | | `lint` | Validate + layout overlap detection. Opt-in heuristics: `--send-receive`, `--fan-out`, `--dsp-loop` (see [Lint checks](#lint-checks)) |
 | | `stats` | Per-file metrics: fan-in/out, class histogram, orphans. Aggregates across all files in directory mode |
 | | `connections` | List all patch cords to/from one object |
-| | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, duplicate detection. `--kind classic\|define\|all`, `--templates include\|exclude\|only`, `--schema 1\|2` |
+| | `arrays` | List all PD arrays — classic `#X array` and `array define` — with name, size, options, duplicate detection. `--kind classic\|define\|all`, `--templates include\|exclude\|only`, `--schema 1\|2`, `--data` (saved `#A` contents, schema 2 only) |
+| | `array-data` | Dump the values a patch saves for one named array, one `<index> <value>` per line or `--json`. Fails loudly when the array saves nothing (no `-k` / even save flag) or the name is ambiguous |
 | | `structs` | List data-structure templates (`#N struct`) with typed fields and scalars (`#X scalar`) with template + value count. Flags scalars whose template is undefined. File or directory, `--json` |
 | **Search** | `search` | Find objects by class (`--type`) and/or text (`--text`, glob by default, `--regex` for regex). `--case-sensitive`, `--depth` |
 | | `find-orphans` | Objects with zero connections. `--delete --in-place` removes them; `--include-comments` includes `#X text` |
@@ -169,6 +170,48 @@ overlap detection. Three further heuristics are opt-in:
 
 All three are informational: they produce `STYLE:` lines but do not change
 the exit code. Only structural errors fail lint.
+
+---
+
+## Array contents
+
+PD saves an array's values as `#A <onset> <value>…;` records that follow the
+declaration. `arrays --data` and `array-data` decode them with PD's own rules:
+
+- A record binds to the **most recently declared** array anywhere in the file,
+  not to the nearest one structurally and not scoped to a canvas.
+- One array's values may span several records (PD writes long arrays in
+  chunks), each carrying the onset of its first value — the first number after
+  `#A` is an index, not a value. Hand-transcribing a table into code and
+  counting that onset as element 0 shifts every value by one.
+- Only arrays declared with `-k` (or a classic `float K` flag with bit 0 set)
+  store contents; anything else loads as zeros, and `array-data` reports that
+  as an error rather than printing an empty table.
+- Values past the declared size are discarded, as PD does when loading.
+
+`validate` warns when a file breaks these rules — most usefully when `#A`
+records were written as a block after a run of declarations instead of after
+the array each belongs to. PD loads that as "last record wins, every earlier
+array zero", which is invisible until something reads the data:
+
+```
+$ pdtk validate backend/arp_curve_arrays.pd
+OK: patch is valid (2 warning(s))
+- WARNING: depth 0: 33 of 34 #A record(s) overwrite array 's12_duty_channel_scale' …
+- WARNING: depth 0: array 's12_duty_channel_scale' has size 1 but its #A data supplies 161 more value(s), which PD discards
+```
+
+```sh
+# One `<index> <value>` per line — diff-friendly, awk-friendly
+pdtk array-data seq_abs/ARPEGGIATOR.pd arpnoteselect
+
+# Every array in a tree, with contents
+pdtk arrays src/ --kind all --data --json | jq '.arrays[] | {name, data}'
+```
+
+The machine-readable form makes a patch array the source of truth for tables
+duplicated in code: regenerate the constant from the patch in CI and fail on
+any difference, instead of trusting a comment that says the two match.
 
 ---
 
