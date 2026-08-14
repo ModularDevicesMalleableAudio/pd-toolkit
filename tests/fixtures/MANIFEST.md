@@ -40,6 +40,7 @@ Object indices are annotated in comments where relevant.
 | `arrays.pd` | Array definitions | 5 | 2 | Array inventory |
 | `array_in_canvas.pd` | Bare `#X array` beside connected objects | 3 | 1 | `#X array` is an indexed gobj (Pd `glist_add`); connection index math must count it |
 | `classic_array_save_flags.pd` | `#X array … float K` save flag bitfield | 4 | 0 | K=0/3/9/abc (saveit, filestyle enum, hidename, malformed) |
+| `array_saved_data.pd` | `#A` saved array contents | 6 | 1 | Data binding to the preceding declaration, chunked `#A` records, an unsaved array, classic + define arrays in one file |
 | `orphans.pd` | Unconnected objects | 5 | 1 | Orphan detection |
 | `displays.pd` | Connected debug displays | 7 | 4 | Display finder |
 | `signal_chain.pd` | Audio-rate objects | 5 | 5 | Signal type inference |

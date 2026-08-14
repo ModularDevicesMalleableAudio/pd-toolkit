@@ -379,6 +379,7 @@ test_fixture_coverage() {
         "gui_types:all_gui_types.pd"
         "send_receive:send_receive.pd"
         "arrays:arrays.pd"
+        "array_saved_data:array_saved_data.pd"
         "orphans:orphans.pd"
         "displays:displays.pd"
         "signal_chain:signal_chain.pd"
