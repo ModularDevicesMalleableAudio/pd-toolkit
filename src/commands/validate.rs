@@ -247,8 +247,11 @@ pub fn run(
         }
     }
 
-    // 5) Detached `#A` array data (data bound to the wrong array or dropped).
+    // 5) `#A` array data bound to the wrong array or dropped: records with no
+    //    declaration to attach to, and records that overwrite each other
+    //    because they were written as a block after several declarations.
     warnings.extend(crate::commands::common::detached_array_data(&patch));
+    warnings.extend(crate::commands::common::misbound_array_data(&patch));
 
     let valid = errors.is_empty();
     let exit_code = i32::from(!valid);

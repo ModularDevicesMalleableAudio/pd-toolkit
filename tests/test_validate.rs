@@ -565,6 +565,64 @@ fn validate_warns_on_scalar_field_count_mismatch() {
 }
 
 #[test]
+fn validate_warns_when_array_data_piles_onto_one_array() {
+    // Two declarations followed by a block of `#A` records: PD binds every
+    // record to the most recently declared array, so `first` loads as zeros
+    // and `second` keeps only the last record (verified against Pd 0.54).
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 20 20 array define -k first 2;\n\
+                 #X obj 20 60 array define -k second 2;\n\
+                 #A 0 11 12;\n\
+                 #A 0 21 22;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "mis-bound data is a warning");
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("overwrite array 'second'"),
+        "expected an overwrite warning; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_warns_when_array_data_overflows_the_declared_size() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 20 20 array define -k small 2;\n\
+                 #A 0 1 2 3 4;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        s.contains("'small'") && s.contains("discards"),
+        "expected an overflow warning; got:\n{s}"
+    );
+}
+
+#[test]
+fn validate_does_not_warn_on_chunked_array_data() {
+    // PD writes long arrays as ascending non-overlapping `#A` chunks.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 20 20 array define -k chunks 6;\n\
+                 #A 0 1 2 3;\n\
+                 #A 3 4 5 6;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout_string(&out);
+    assert!(
+        !s.contains("overwrite"),
+        "chunked data must not warn; got:\n{s}"
+    );
+}
+
+#[test]
 fn validate_no_warning_for_consistent_scalar() {
     let input = "#N struct point float x float y;\n\
                  #N canvas 0 22 450 300 12;\n\
