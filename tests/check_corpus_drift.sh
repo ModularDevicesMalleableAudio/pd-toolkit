@@ -26,9 +26,11 @@ fi
 EXPECTED_LINES=$(wc -l < "$SOURCE")
 
 # Extract the first $EXPECTED_LINES `#X obj` lines, strip prefix `#X obj X Y `
-# and trailing `;`, leaving just the `array …` body.
+# and trailing `;`, leaving just the `array …` body.  The row limit is applied
+# with awk rather than `head`, which closes the pipe early and makes grep fail
+# with SIGPIPE under `set -o pipefail` (an intermittent false failure).
 DERIVED=$(grep -E '^#X obj [0-9]+ [0-9]+ array (define|d) ' "$FIXTURE" \
-    | head -n "$EXPECTED_LINES" \
+    | awk -v n="$EXPECTED_LINES" 'NR <= n' \
     | sed -E 's/^#X obj [0-9]+ [0-9]+ //; s/;$//')
 
 if ! diff -u <(echo "$DERIVED") "$SOURCE" > /tmp/corpus_drift.diff; then
