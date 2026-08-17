@@ -1,0 +1,15 @@
+#N canvas 0 22 450 300 12;
+#X obj 20 20 array define -k -yrange 0 12 saved_notes 8;
+#A 0 0 2 4 5 7 9 11 12;
+#X obj 20 60 array define -k chunked 6;
+#A 0 1 2 3;
+#A 3 4 5 6;
+#X obj 20 100 array define unsaved 4;
+#N canvas 0 50 450 250 (subpatch) 0;
+#X array classic_saved 4 float 3;
+#A 0 10 20 30 40;
+#X coords 0 1 3 -1 200 140 1 0 0;
+#X restore 20 140 graph;
+#X obj 20 200 tabread saved_notes;
+#X obj 20 240 print;
+#X connect 4 0 5 0;

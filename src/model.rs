@@ -432,6 +432,123 @@ pub fn parse_scalar(raw: &str) -> Option<(String, Vec<String>)> {
     Some((name, flat))
 }
 
+// Arrays
+
+/// Which syntax declared an array.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrayKind {
+    /// `#X array name size float flags;` — a garray in a graph canvas.
+    Classic,
+    /// `#X obj X Y array define [flags] name size;` — Pd vanilla `array define`.
+    Define,
+}
+
+/// A decoded array declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayDecl {
+    pub kind: ArrayKind,
+    /// Array name with PD escapes resolved (`\$1` → `$1`).
+    pub name: String,
+    /// Declared element count.
+    pub size: usize,
+    /// Kind-specific remaining tokens: for `Define` the flag tokens preceding
+    /// the name/size pair (`-k`, `-yrange lo hi`, …); for `Classic` the tokens
+    /// following the size (`float K`).
+    pub extra: Vec<String>,
+}
+
+/// Outcome of decoding one entry as an array declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArrayDeclParse {
+    /// The entry does not declare an array.
+    NotArray,
+    /// The entry declares an array but cannot be decoded; the payload is a
+    /// human-readable reason (without the offending raw entry).
+    Malformed(String),
+    Decl(ArrayDecl),
+}
+
+/// Decode an array declaration — either a classic `#X array name size …` entry
+/// or an `array define` / `array d` object — into its kind, name, size and
+/// kind-specific extra tokens.
+///
+/// This is the single decoder for "what array does this entry declare"; the
+/// `arrays` command layers flag parsing on top of it, and `#A` data binding
+/// (`analysis::array_data`) uses it to find the arrays data attaches to.
+#[must_use]
+pub fn parse_array_decl(raw: &str) -> ArrayDeclParse {
+    let toks: Vec<&str> = content_without_width_hint(raw).split_whitespace().collect();
+    if toks.len() < 2 || toks[0] != "#X" {
+        return ArrayDeclParse::NotArray;
+    }
+    match toks[1] {
+        "array" => parse_classic_decl(&toks),
+        "obj" => parse_define_decl(&toks),
+        _ => ArrayDeclParse::NotArray,
+    }
+}
+
+/// `#X array <name> <size> [float K]`
+fn parse_classic_decl(toks: &[&str]) -> ArrayDeclParse {
+    if toks.len() < 4 {
+        return ArrayDeclParse::Malformed("malformed #X array entry".to_string());
+    }
+    let Ok(size) = toks[3].parse::<usize>() else {
+        return ArrayDeclParse::Malformed("malformed #X array entry".to_string());
+    };
+    ArrayDeclParse::Decl(ArrayDecl {
+        kind: ArrayKind::Classic,
+        name: crate::parser::escape::unescape_pd_token(toks[2]),
+        size,
+        extra: toks[4..].iter().map(|s| (*s).to_string()).collect(),
+    })
+}
+
+/// `#X obj X Y array (define|d) [flags…] <name> <size>`
+fn parse_define_decl(toks: &[&str]) -> ArrayDeclParse {
+    if toks.len() < 6 || toks[4] != "array" || (toks[5] != "define" && toks[5] != "d") {
+        return ArrayDeclParse::NotArray;
+    }
+    let args = &toks[6..];
+    if args.len() < 2 {
+        return ArrayDeclParse::Malformed(format!(
+            "malformed `array {}` (need at least <name> <size>)",
+            toks[5]
+        ));
+    }
+    // Right-anchored: the last two args are always name and size, so unknown
+    // flags cannot shift them.
+    let size_tok = args[args.len() - 1];
+    let Ok(size) = size_tok.parse::<usize>() else {
+        return ArrayDeclParse::Malformed(format!(
+            "malformed `array {}` (size `{}` is not an integer)",
+            toks[5], size_tok
+        ));
+    };
+    ArrayDeclParse::Decl(ArrayDecl {
+        kind: ArrayKind::Define,
+        name: crate::parser::escape::unescape_pd_token(args[args.len() - 2]),
+        size,
+        extra: args[..args.len() - 2]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+    })
+}
+
+/// Decode an `#A <onset> <value>…;` array-data record into its onset and value
+/// tokens.  Returns `None` for any other entry, or when the onset is not a
+/// non-negative integer.
+#[must_use]
+pub fn parse_array_data(raw: &str) -> Option<(usize, Vec<String>)> {
+    let toks: Vec<&str> = strip_terminator(raw).split_whitespace().collect();
+    if toks.len() < 2 || toks[0] != "#A" {
+        return None;
+    }
+    let onset = toks[1].parse::<usize>().ok()?;
+    Some((onset, toks[2..].iter().map(|s| (*s).to_string()).collect()))
+}
+
 // Connection
 
 #[derive(Debug, Clone, PartialEq, Eq)]

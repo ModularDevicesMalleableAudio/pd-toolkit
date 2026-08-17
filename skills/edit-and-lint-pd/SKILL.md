@@ -11,7 +11,7 @@ description: How to read, edit, and auto-format Pure Data (.pd) patch files. Use
 
 ```
 1. pdtk list file.pd               # understand structure
-2. read file.pd                     # examine full content
+2. pdtk search/connections/trace    # examine targets without hand-parsing
 3. pdtk <command> ...               # make changes
 4. pdtk validate file.pd            # verify connections valid
 5. pdtk format file.pd --in-place   # clean up layout (optional)
@@ -26,7 +26,7 @@ Depths are **0-based**: `--depth 0` = top-level canvas, `--depth 1` = first subp
 
 Detailed usage for each command group:
 
-- [Inspection commands](./inspection.md) — parse, list, validate, lint, stats, connections, arrays
+- [Inspection commands](./inspection.md) — parse, list, validate, lint, stats, connections, arrays, array-data
 - [Search & analysis commands](./search.md) — search, find-orphans, find-displays, trace, diff, deps
 - [Editing commands](./editing.md) — insert, delete, modify, connect, disconnect, renumber, rename-send
 - [Layout commands](./layout.md) — format
@@ -47,8 +47,8 @@ Detailed usage for each command group:
 
 ### What counts as an object (gets a 0-based index)
 
-✅ `#X obj`, `#X msg`, `#X text`, `#X floatatom`, `#X symbolatom`, `#X restore`
-❌ `#N canvas`, `#X connect`, `#X coords`, `#X array`, `#X declare`, `#X f N`, `#A`
+✅ `#X obj`, `#X msg`, `#X text`, `#X floatatom`, `#X symbolatom`, `#X restore`, `#X array`, `#X scalar`
+❌ `#N canvas`, `#N struct`, `#X connect`, `#X coords`, `#X declare`, `#X f N`, `#A`
 
 ### `#X restore` is an object in the PARENT canvas
 

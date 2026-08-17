@@ -238,12 +238,28 @@ fn main() {
                 e.exit_code()
             }
         },
+        Some(Commands::ArrayData { target, name, json }) => {
+            let cfg = commands::array_data::ArrayDataConfig { json, verbose };
+            match commands::array_data::run(&target, &name, cfg) {
+                Ok(out) => {
+                    if !out.is_empty() {
+                        println!("{out}");
+                    }
+                    0
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    e.exit_code()
+                }
+            }
+        }
         Some(Commands::Arrays {
             target,
             json,
             kind,
             templates,
             schema,
+            data,
         }) => {
             let cfg = commands::arrays::ArraysConfig {
                 schema: match schema.as_str() {
@@ -262,6 +278,7 @@ fn main() {
                 },
                 json,
                 verbose,
+                data,
             };
             match commands::arrays::run(&target, cfg) {
                 Ok(out) => {

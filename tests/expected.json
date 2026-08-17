@@ -638,6 +638,46 @@
       }
     ]
   },
+  "handcrafted/array_saved_data.pd": {
+    "_note": "Saved `#A` contents: data binds to the most recent declaration, one array's data may span several `#A` records, and an array without -k saves nothing.",
+    "depth_0_objects": 6,
+    "depth_0_connections": 1,
+    "max_depth": 1,
+    "array_data": [
+      {
+        "name": "saved_notes",
+        "kind": "define",
+        "size": 8,
+        "saved": true,
+        "records": 1,
+        "values": [0, 2, 4, 5, 7, 9, 11, 12]
+      },
+      {
+        "name": "chunked",
+        "kind": "define",
+        "size": 6,
+        "saved": true,
+        "records": 2,
+        "values": [1, 2, 3, 4, 5, 6]
+      },
+      {
+        "name": "unsaved",
+        "kind": "define",
+        "size": 4,
+        "saved": false,
+        "records": 0,
+        "values": []
+      },
+      {
+        "name": "classic_saved",
+        "kind": "classic",
+        "size": 4,
+        "saved": true,
+        "records": 1,
+        "values": [10, 20, 30, 40]
+      }
+    ]
+  },
   "corpus/array_define_real.pd": {
     "_note": "Real-corpus regression for `array define`. 319 verbatim corpus rows + 2 subpatch rows + 19 synthetic rows = 340 define rows; 1 classic row; cross-kind duplicate sample_d_form.",
     "arrays_define_count": 340,

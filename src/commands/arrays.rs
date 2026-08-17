@@ -1,10 +1,10 @@
 use crate::errors::PdtkError;
 use crate::io;
-use pdtk::model::EntryKind;
-use pdtk::parser::escape::unescape_pd_token;
+use pdtk::analysis::array_data::{ArrayContents, array_contents};
+use pdtk::model::{ArrayDeclParse, ArrayKind, EntryKind, parse_array_decl};
 use pdtk::parser::parse;
 use serde_json::{Number, Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
 use std::path::Path;
 
@@ -39,6 +39,8 @@ pub struct ArraysConfig {
     pub templates: TemplateFilter,
     pub json: bool,
     pub verbose: bool,
+    /// Include each array's saved `#A` contents.
+    pub data: bool,
 }
 
 impl Default for ArraysConfig {
@@ -49,33 +51,36 @@ impl Default for ArraysConfig {
             templates: TemplateFilter::Include,
             json: false,
             verbose: false,
+            data: false,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-struct Row {
-    file: String,
-    depth: usize,
-    index: Option<usize>,
-    kind: RowKind,
-    name: String,
-    size: usize,
+pub(crate) struct Row {
+    pub(crate) file: String,
+    pub(crate) depth: usize,
+    pub(crate) index: Option<usize>,
+    pub(crate) kind: RowKind,
+    pub(crate) name: String,
+    pub(crate) size: usize,
     is_template: bool,
     define: Option<DefinePayload>,
     classic: Option<ClassicPayload>,
     /// Graph geometry from the containing canvas's `#X coords`, if any.
     graph: Option<Value>,
+    /// Saved `#A` contents, when requested with `--data`.
+    pub(crate) data: Option<ArrayContents>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RowKind {
+pub(crate) enum RowKind {
     Classic,
     Define,
 }
 
 impl RowKind {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             RowKind::Classic => "classic",
             RowKind::Define => "define",
@@ -122,8 +127,21 @@ impl ClassicPayload {
 
 /// Run `pdtk arrays`.
 pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
-    // Resolve effective kind filter (default depends on schema).
-    let kind_filter = match cfg.kind {
+    if cfg.data && cfg.schema == Schema::V1 {
+        return Err(PdtkError::Usage(
+            "--data is not available with --schema 1 (the v1 shape is frozen); \
+             use --schema 2 or `pdtk array-data`"
+                .to_string(),
+        ));
+    }
+    let kind_filter = effective_kind_filter(&cfg);
+    let rows = collect_rows(target, &cfg, kind_filter)?;
+    Ok(render(&rows, &cfg, kind_filter))
+}
+
+/// Resolve the effective kind filter (the default depends on the schema).
+fn effective_kind_filter(cfg: &ArraysConfig) -> KindFilter {
+    match cfg.kind {
         Some(k) => k,
         None => match cfg.schema {
             Schema::V1 => KindFilter::Classic,
@@ -138,8 +156,17 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                 KindFilter::Classic
             }
         },
-    };
+    }
+}
 
+/// Scan `target` (file or directory) for array declarations, apply the `--kind`
+/// and `--templates` filters, and return the rows in a stable order.  Shared
+/// with `pdtk array-data`, which selects one row by name.
+pub(crate) fn collect_rows(
+    target: &str,
+    cfg: &ArraysConfig,
+    kind_filter: KindFilter,
+) -> Result<Vec<Row>, PdtkError> {
     let files = io::scan_pd_files(target)?;
 
     // Single-file ergonomics: warn (under --verbose) when the input file is
@@ -151,7 +178,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
             if cfg.verbose {
                 eprintln!("warning: {}: not a .pd file, skipped", p.display());
             }
-            return Ok(render(&[], &cfg, kind_filter));
+            return Ok(Vec::new());
         }
     }
 
@@ -163,7 +190,19 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
         let Ok(patch) = parse(&input) else { continue };
         let file_str = file.display().to_string();
 
-        for e in &patch.entries {
+        // An `#A` record binds to the most recently declared array anywhere in
+        // the file, so read the whole file's contents in one pass and attach
+        // them by declaration entry index.
+        let contents: HashMap<usize, ArrayContents> = if cfg.data {
+            array_contents(&patch.entries)
+                .into_iter()
+                .map(|c| (c.entry, c))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+
+        for (entry_index, e) in patch.entries.iter().enumerate() {
             match e.kind {
                 EntryKind::Array => {
                     if let Some(mut row) = parse_classic(&e.raw, &file_str, e.depth) {
@@ -179,6 +218,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                                 .find(|c| c.kind == EntryKind::Coords && c.canvas_id == Some(cid))
                                 .and_then(|c| parse_coords(&c.raw));
                         }
+                        row.data = contents.get(&entry_index).cloned();
                         rows.push(row);
                     } else if cfg.verbose {
                         eprintln!(
@@ -193,7 +233,11 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
                         parse_define(&e.raw, &file_str, e.depth, e.object_index, cfg.verbose)
                     {
                         match parsed {
-                            DefineParse::Row(row) => rows.push(*row),
+                            DefineParse::Row(row) => {
+                                let mut row = *row;
+                                row.data = contents.get(&entry_index).cloned();
+                                rows.push(row);
+                            }
                             DefineParse::Malformed(msg) => {
                                 if cfg.verbose {
                                     eprintln!("warning: {file_str}: {msg}");
@@ -248,7 +292,7 @@ pub fn run(target: &str, cfg: ArraysConfig) -> Result<String, PdtkError> {
             .then(a.name.cmp(&b.name))
     });
 
-    Ok(render(&rows, &cfg, kind_filter))
+    Ok(rows)
 }
 
 enum DefineParse {
@@ -258,32 +302,29 @@ enum DefineParse {
 
 /// Parse an `#X array name N float K;` entry.
 fn parse_classic(raw: &str, file: &str, internal_depth: usize) -> Option<Row> {
-    let parts: Vec<&str> = raw
-        .trim()
-        .trim_end_matches(';')
-        .split_whitespace()
-        .collect();
-    // #X array <name> <size> [float K]
-    if parts.len() < 4 || parts[0] != "#X" || parts[1] != "array" {
+    let ArrayDeclParse::Decl(decl) = parse_array_decl(raw) else {
+        return None;
+    };
+    if decl.kind != ArrayKind::Classic {
         return None;
     }
-    let name_raw = parts[2];
-    let size = parts[3].parse::<usize>().ok()?;
-    let save_flag: Option<i64> = parts.get(5).and_then(|s| s.parse::<i64>().ok());
+    // `#X array <name> <size> float K` — the save flag follows the `float`
+    // element-type token.
+    let save_flag: Option<i64> = decl.extra.get(1).and_then(|s| s.parse::<i64>().ok());
 
-    let name = unescape_pd_token(name_raw);
-    let is_template = name_is_template(&name);
+    let is_template = name_is_template(&decl.name);
     Some(Row {
         file: file.to_string(),
         depth: internal_depth.saturating_sub(1),
         index: None,
         kind: RowKind::Classic,
-        name,
-        size,
+        name: decl.name,
+        size: decl.size,
         is_template,
         define: None,
         classic: Some(ClassicPayload { save_flag }),
         graph: None,
+        data: None,
     })
 }
 
@@ -331,48 +372,20 @@ fn parse_define(
     object_index: Option<usize>,
     verbose: bool,
 ) -> Option<DefineParse> {
-    // Strip trailing `;` and split.
-    let body = raw.trim().trim_end_matches(';').trim_end();
-    let toks: Vec<&str> = body.split_whitespace().collect();
     // #X obj X Y array (define|d) [flags...] <name> <size>
-    if toks.len() < 4 || toks[0] != "#X" || toks[1] != "obj" {
-        return None;
-    }
-    if toks.len() < 6 {
-        return None;
-    }
-    if toks[4] != "array" {
-        return None;
-    }
-    if toks[5] != "define" && toks[5] != "d" {
-        return None;
-    }
-    // After the `#X obj X Y array (define|d)` prefix we have the args.
-    let args = &toks[6..];
-    if args.len() < 2 {
-        return Some(DefineParse::Malformed(format!(
-            "malformed `array {}` (need at least <name> <size>): {}",
-            toks[5],
-            raw.trim()
-        )));
-    }
-    let size_tok = args[args.len() - 1];
-    let name_tok = args[args.len() - 2];
-    let flag_toks = &args[..args.len() - 2];
-
-    // Right-anchor: size must parse as integer.
-    let size: usize = match size_tok.parse::<usize>() {
-        Ok(n) => n,
-        Err(_) => {
-            return Some(DefineParse::Malformed(format!(
-                "malformed `array {}` (size `{}` is not an integer): {}",
-                toks[5],
-                size_tok,
-                raw.trim()
-            )));
+    let decl = match parse_array_decl(raw) {
+        ArrayDeclParse::NotArray => return None,
+        ArrayDeclParse::Malformed(reason) => {
+            return Some(DefineParse::Malformed(format!("{reason}: {}", raw.trim())));
         }
+        ArrayDeclParse::Decl(d) => d,
     };
-    let name = unescape_pd_token(name_tok);
+    if decl.kind != ArrayKind::Define {
+        return None;
+    }
+    let flag_toks: Vec<&str> = decl.extra.iter().map(String::as_str).collect();
+    let name = decl.name;
+    let size = decl.size;
     let is_template = name_is_template(&name);
 
     let mut payload = DefinePayload {
@@ -517,6 +530,7 @@ fn parse_define(
         define: Some(payload),
         classic: None,
         graph: None,
+        data: None,
     })))
 }
 
@@ -554,6 +568,34 @@ fn name_is_template(name: &str) -> bool {
         }
     }
     false
+}
+
+/// JSON payload for an array's saved `#A` contents.
+pub(crate) fn data_to_json(d: &ArrayContents) -> Value {
+    json!({
+        "saved": d.saved(),
+        "records": d.records,
+        "values": d.values.iter().copied().map(json_number).collect::<Vec<Value>>(),
+        "overflow": d.overflow,
+        "non_numeric": d.non_numeric,
+    })
+}
+
+/// Render a PD float as JSON, keeping whole numbers integral (PD writes `3`,
+/// not `3.0`, and a table of MIDI notes should read like one).
+pub(crate) fn json_number(v: f64) -> Value {
+    if v.fract() == 0.0 && v.abs() < 9.007_199_254_740_992e15 {
+        return json!(v as i64);
+    }
+    Number::from_f64(v).map_or(Value::Null, Value::Number)
+}
+
+/// Render a PD float as text, keeping whole numbers integral.
+pub(crate) fn format_number(v: f64) -> String {
+    if v.fract() == 0.0 && v.abs() < 9.007_199_254_740_992e15 {
+        return format!("{}", v as i64);
+    }
+    format!("{v}")
 }
 
 fn render(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> String {
@@ -669,6 +711,9 @@ fn row_to_json_v2(r: &Row) -> Value {
     if let Some(g) = &r.graph {
         obj.insert("graph".into(), g.clone());
     }
+    if let Some(d) = &r.data {
+        obj.insert("data".into(), data_to_json(d));
+    }
     if let Some(c) = &r.classic {
         let save_flag = match c.save_flag {
             Some(k) => json!(k),
@@ -762,6 +807,15 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
                 }
                 out.push_str(&line);
                 out.push('\n');
+                if let Some(d) = &r.data {
+                    if d.saved() {
+                        let values: Vec<String> =
+                            d.values.iter().copied().map(format_number).collect();
+                        let _ = writeln!(out, "  data: {}", values.join(" "));
+                    } else {
+                        out.push_str("  data: none saved\n");
+                    }
+                }
             }
             let dups = collect_duplicates_v2(rows);
             if !dups.is_empty() {

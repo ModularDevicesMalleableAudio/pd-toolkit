@@ -142,7 +142,15 @@ fn build_root_command() -> clap::Command {
                         .value_name("N")
                         .value_parser(["1", "2"])
                         .default_value("2"),
-                ),
+                )
+                .arg(Arg::new("data").long("data").num_args(0)),
+        )
+        .subcommand(
+            Command::new("array-data")
+                .about("Dump the saved contents of one named array")
+                .arg(Arg::new("target").required(true))
+                .arg(Arg::new("name").required(true))
+                .arg(Arg::new("json").long("json").num_args(0)),
         )
         .subcommand(
             Command::new("search")

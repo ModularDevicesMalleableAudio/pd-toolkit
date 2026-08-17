@@ -39,6 +39,37 @@ pub fn detached_array_data(patch: &Patch) -> Vec<String> {
     msgs
 }
 
+/// Detect `#A` array data that PD will not load the way the file looks like it
+/// intends. Every `#A` record binds to the most recently *declared* array, so
+/// a block of records placed after a run of declarations lands entirely on the
+/// last one: each record overwrites the previous, the earlier arrays load as
+/// zeros, and values past the surviving array's size are discarded. Returns
+/// human-readable messages (empty = no problems found).
+pub fn misbound_array_data(patch: &Patch) -> Vec<String> {
+    let mut msgs = Vec::new();
+    for c in pdtk::analysis::array_data::array_contents(&patch.entries) {
+        let user_depth = c.depth.saturating_sub(1);
+        let name = &c.decl.name;
+        if c.overlapping_records > 0 {
+            msgs.push(format!(
+                "depth {user_depth}: {} of {} #A record(s) overwrite array '{name}' \
+                 (each starts before the previous ended) — #A binds to the most \
+                 recently declared array, so put each record directly after the \
+                 array it belongs to",
+                c.overlapping_records, c.records
+            ));
+        }
+        if c.overflow > 0 {
+            msgs.push(format!(
+                "depth {user_depth}: array '{name}' has size {} but its #A data supplies \
+                 {} more value(s), which PD discards",
+                c.decl.size, c.overflow
+            ));
+        }
+    }
+    msgs
+}
+
 /// Post-mutation validation: checks that all connection src/dst indices are
 /// in range for their own canvas.  Sibling subpatches at the same depth have
 /// independent index spaces, so counts are per `canvas_id`, not per depth.

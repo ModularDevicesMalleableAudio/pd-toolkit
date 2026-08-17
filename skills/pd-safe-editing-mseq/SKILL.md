@@ -11,10 +11,10 @@ description: Safe Pure Data (.pd) editing workflow for MSEQ using pdtk only. Use
 - Any request involving `pdtk` commands
 
 ## Hard rules
-- Use only `.tools/bin/pdtk` for `.pd` read/search/mutation
+- Use only `pdtk` for `.pd` read/search/mutation
 - Do not use raw text tools on `.pd` (`read`, `edit`, `write`, `grep`, `sed`, `awk`, scripts)
 - Do not hand-edit `#X connect` lines
-- Validate after every mutation: `.tools/bin/pdtk validate <file>`
+- Validate after every mutation: `pdtk validate <file>`
 
 ## Default workflow
 1. `pdtk list <file>` to identify objects and depth
@@ -37,4 +37,4 @@ description: Safe Pure Data (.pd) editing workflow for MSEQ using pdtk only. Use
 ## References
 - `references/workflow.md` — command templates and common recipes
 - `references/checklists.md` — pre-flight and post-flight checks
-- `/home/kris/code/pd-toolkit/skills/edit-and-lint-pd/SKILL.md` — full pdtk reference
+- `/home/kris/code/mdma/pdtk/skills/edit-and-lint-pd/SKILL.md` — full pdtk reference

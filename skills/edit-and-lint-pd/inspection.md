@@ -80,6 +80,7 @@ Flags:
 - `--schema 1|2` — pin output schema. v1 reproduces legacy output
   exactly; v2 (default) adds `schema_version`, `kind`, `is_template`,
   per-row `define`/`classic` payloads, and richer `duplicate_names`.
+- `--data` — include each array's saved `#A` contents (schema 2 only).
 
 ### v2 JSON shape (excerpt)
 
@@ -114,3 +115,24 @@ The right-anchored parser guarantees `name` and `size` are recovered
 correctly even when an unknown future flag appears in `array define`;
 unknown / superseded / malformed tokens land in `discarded_tokens`
 with a `reason` and the row's `parse_status` becomes `"partial"`.
+
+## array-data
+
+Dump the values a patch saves for one named array — use this instead of
+reading `#A` lines by hand, where the leading onset number is easy to
+miscount as the first value.
+
+```bash
+pdtk array-data file.pd arpnoteselect          # `<index> <value>` per line
+pdtk array-data src/ scale_table --json        # {file, name, size, data:{…}}
+```
+
+Behaviour worth knowing:
+
+- `#A` records bind to the most recently declared array, and one array's
+  data may span several records, each starting at its own onset.
+- Only `-k` arrays (or classic `float K` with bit 0 set) save contents;
+  for anything else the command errors rather than printing an empty
+  table, since PD loads those as zeros.
+- A name matching arrays in several files is an error — narrow the target
+  to one file.
