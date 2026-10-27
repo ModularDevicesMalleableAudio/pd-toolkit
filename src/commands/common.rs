@@ -23,6 +23,29 @@ pub fn ensure_single_entry(raw: &str) -> Result<(), PdtkError> {
     Ok(())
 }
 
+/// Detect entries that have absorbed a following record: a continuation line
+/// that starts with a `#X`/`#N`/`#A` sigil.  This is what a message whose
+/// final `;` is escaped looks like on disk — PD reads the next record as part
+/// of the message, so the object vanishes and later indices shift.  Returns
+/// human-readable messages (empty = no problems found).
+pub fn swallowed_records(patch: &Patch) -> Vec<String> {
+    let mut msgs = Vec::new();
+    for (i, e) in patch.entries.iter().enumerate() {
+        let swallowed = e.raw.lines().skip(1).find(|line| {
+            let line = line.trim_start();
+            ["#X ", "#N ", "#A "].iter().any(|s| line.starts_with(s))
+        });
+        if let Some(line) = swallowed {
+            msgs.push(format!(
+                "entry {i}: contains what looks like another record ({}) — the preceding \
+                 text probably ends in an escaped \\; with no terminating ';'",
+                line.trim()
+            ));
+        }
+    }
+    msgs
+}
+
 /// Whether an entry is an `array define` / `array d` object, which can carry
 /// `#A` saved data.
 pub(crate) fn is_array_define(entry: &Entry) -> bool {

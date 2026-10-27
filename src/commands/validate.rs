@@ -211,6 +211,10 @@ pub fn run(
         }
     }
 
+    //     Also flag the opposite mistake: a record absorbed into the preceding
+    //     entry because that entry's final ';' was escaped.
+    warnings.extend(crate::commands::common::swallowed_records(&patch));
+
     // 4c) Data-structure consistency (warnings, mirroring Pd's load-time
     //     diagnostics): a `#X scalar` must reference a defined `#N struct`,
     //     and supply exactly as many flat values as the template has scalar

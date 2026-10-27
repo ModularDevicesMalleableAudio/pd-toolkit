@@ -673,3 +673,26 @@ fn validate_no_dangling_warning_for_dollar_template() {
     let s = stdout_string(&out);
     assert!(!s.contains("undefined template"), "got:\n{s}");
 }
+
+#[test]
+fn validate_warns_on_record_swallowed_by_escaped_final_semicolon() {
+    let input = "#N canvas 0 22 450 300 12;\n#X msg 10 10 foo \\;\n#X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "swallowed record is a warning");
+    let s = stdout_string(&out);
+    assert!(s.contains("looks like another record"), "got:\n{s}");
+    assert!(s.contains("#X obj 50 100 print"), "got:\n{s}");
+}
+
+#[test]
+fn validate_no_swallow_warning_for_wrapped_message() {
+    let input = "#N canvas 0 22 450 300 12;\n#X msg 10 10 foo \\; bar 1 2\n3 4 \\;;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(stdout_string(&out).trim(), "OK: patch is valid");
+}
