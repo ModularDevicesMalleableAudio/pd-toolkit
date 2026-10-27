@@ -1,4 +1,4 @@
-use crate::commands::common::{object_insert_pos, validate_patch};
+use crate::commands::common::{ensure_single_entry, object_insert_pos, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
 use pdtk::model::{Entry, EntryKind};
@@ -16,6 +16,8 @@ pub fn run(
     backup: bool,
     output: Option<&str>,
 ) -> Result<(String, i32), PdtkError> {
+    ensure_single_entry(entry)?;
+
     let input = io::read_patch_file(file)?;
     let tok = tokenize_entries(&input);
     let mut entries = build_entries(&tok.entries);

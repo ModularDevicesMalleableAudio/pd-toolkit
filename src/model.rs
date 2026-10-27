@@ -73,7 +73,7 @@ pub struct Entry {
 /// raw entry string (or bare object text).  Returns a slice of the original.
 #[must_use]
 pub fn content_without_width_hint(raw: &str) -> &str {
-    let without_semi = raw.trim().trim_end_matches(';').trim_end();
+    let without_semi = strip_terminator(raw).trim();
     if let Some(comma_pos) = without_semi.rfind(", f ") {
         let after = without_semi[comma_pos + 4..].trim();
         if after.parse::<i32>().is_ok() {
@@ -88,7 +88,7 @@ pub fn content_without_width_hint(raw: &str) -> &str {
 /// no width hint is present.
 #[must_use]
 pub fn trailing_width_hint(content: &str) -> Option<i32> {
-    let without_semi = content.trim().trim_end_matches(';').trim_end();
+    let without_semi = strip_terminator(content).trim();
     let comma_pos = without_semi.rfind(", f ")?;
     without_semi[comma_pos + 4..].trim().parse::<i32>().ok()
 }
@@ -359,11 +359,25 @@ impl Template {
     }
 }
 
-/// Strip exactly one trailing entry terminator `;` (preserving any escaped
-/// `\;`), after trimming trailing whitespace/newlines.
-fn strip_terminator(raw: &str) -> &str {
+/// Strip exactly one trailing entry terminator `;`, after trimming trailing
+/// whitespace/newlines.  A trailing escaped `\;` is message content, not a
+/// terminator, and is left in place.
+#[must_use]
+pub fn strip_terminator(raw: &str) -> &str {
     let t = raw.trim_end();
-    t.strip_suffix(';').unwrap_or(t)
+    match t.strip_suffix(';') {
+        Some(body)
+            if body
+                .bytes()
+                .rev()
+                .take_while(|&b| b == b'\\')
+                .count()
+                .is_multiple_of(2) =>
+        {
+            body
+        }
+        _ => t,
+    }
 }
 
 /// Parse a `#N struct` template definition into its name and typed fields.
@@ -772,6 +786,26 @@ mod tests {
         assert_eq!(trailing_width_hint("t b b b b, f 200"), Some(200));
         assert_eq!(trailing_width_hint("t b b b b"), None);
         assert_eq!(content_without_width_hint("t b b b b, f 200"), "t b b b b");
+    }
+
+    #[test]
+    fn strip_terminator_keeps_trailing_escaped_semicolon() {
+        assert_eq!(
+            strip_terminator(r"#X msg 0 0 foo \;;"),
+            r"#X msg 0 0 foo \;"
+        );
+        assert_eq!(strip_terminator(r"foo \;"), r"foo \;");
+        assert_eq!(strip_terminator(r"path \\;"), r"path \\");
+        assert_eq!(strip_terminator("#X obj 0 0 f;\n"), "#X obj 0 0 f");
+        assert_eq!(strip_terminator("f"), "f");
+    }
+
+    #[test]
+    fn content_without_width_hint_keeps_trailing_escaped_semicolon() {
+        assert_eq!(content_without_width_hint(r"a \; b 1 \;"), r"a \; b 1 \;");
+        assert_eq!(content_without_width_hint(r"a \; b 1 \;;"), r"a \; b 1 \;");
+        assert_eq!(content_without_width_hint(r"a \;, f 20;"), r"a \;");
+        assert_eq!(trailing_width_hint(r"a \;, f 20;"), Some(20));
     }
 
     #[test]

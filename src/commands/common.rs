@@ -1,6 +1,50 @@
+use crate::errors::PdtkError;
 use pdtk::model::{Entry, EntryKind, Patch};
-use pdtk::parser::assign_depth_and_indices;
+use pdtk::parser::{TokenizeWarning, assign_depth_and_indices, tokenize_entries};
 use std::collections::HashMap;
+
+/// Check that `raw` is exactly one `;`-terminated entry before it is spliced
+/// into a patch.  An entry whose final `;` is escaped (`\;`) or missing would
+/// run on into the next line and silently absorb the following record.
+pub fn ensure_single_entry(raw: &str) -> Result<(), PdtkError> {
+    let tok = tokenize_entries(raw);
+    if tok.warnings.contains(&TokenizeWarning::UnterminatedEntry) {
+        return Err(PdtkError::Usage(format!(
+            "entry is not terminated by an unescaped ';' (a trailing \\; is message \
+             content, not a terminator): {raw}"
+        )));
+    }
+    if tok.entries.len() != 1 {
+        return Err(PdtkError::Usage(format!(
+            "expected exactly one entry, found {}: {raw}",
+            tok.entries.len()
+        )));
+    }
+    Ok(())
+}
+
+/// Detect entries that have absorbed a following record: a continuation line
+/// that starts with a `#X`/`#N`/`#A` sigil.  This is what a message whose
+/// final `;` is escaped looks like on disk — PD reads the next record as part
+/// of the message, so the object vanishes and later indices shift.  Returns
+/// human-readable messages (empty = no problems found).
+pub fn swallowed_records(patch: &Patch) -> Vec<String> {
+    let mut msgs = Vec::new();
+    for (i, e) in patch.entries.iter().enumerate() {
+        let swallowed = e.raw.lines().skip(1).find(|line| {
+            let line = line.trim_start();
+            ["#X ", "#N ", "#A "].iter().any(|s| line.starts_with(s))
+        });
+        if let Some(line) = swallowed {
+            msgs.push(format!(
+                "entry {i}: contains what looks like another record ({}) — the preceding \
+                 text probably ends in an escaped \\; with no terminating ';'",
+                line.trim()
+            ));
+        }
+    }
+    msgs
+}
 
 /// Whether an entry is an `array define` / `array d` object, which can carry
 /// `#A` saved data.

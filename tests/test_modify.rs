@@ -549,3 +549,69 @@ fn modify_object_without_hint_stays_hintless() {
     assert!(result.contains("#X obj 50 50 print foo;"), "got:\n{result}");
     assert!(!result.contains(", f "), "no hint expected, got:\n{result}");
 }
+
+#[test]
+fn modify_message_ending_in_escaped_semicolon_keeps_next_object() {
+    // No connection touches the object after the message, so before the fix
+    // the merge passed post-mutation validation and the object vanished.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42;\n\
+                 #X obj 50 100 f 7;\n\
+                 #X obj 50 150 t b b;\n\
+                 #X obj 50 200 print;\n\
+                 #X connect 2 0 3 0;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"foo \; bar 1 \;",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X msg 50 50 foo \\; bar 1 \\;;\n#X obj 50 100 f 7;\n"),
+        "trailing \\; must be kept and the record terminated, got:\n{result}"
+    );
+    let v = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(v.status.code(), Some(0));
+    assert_eq!(
+        integration::stdout_string(&v).trim(),
+        "OK: patch is valid",
+        "no warnings expected"
+    );
+}
+
+#[test]
+fn modify_preserves_width_hint_after_trailing_escaped_semicolon() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X msg 50 50 42, f 30;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "modify",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--text",
+        r"foo \;",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X msg 50 50 foo \\;, f 30;\n#X obj 50 100 print;\n"),
+        "got:\n{result}"
+    );
+}

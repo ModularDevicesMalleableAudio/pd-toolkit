@@ -1,4 +1,4 @@
-use crate::commands::common::validate_patch;
+use crate::commands::common::{ensure_single_entry, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
 use crate::types::signatures::outlet_count;
@@ -140,6 +140,7 @@ pub fn run(
         None => String::new(),
     };
     let new_raw = format!("#X {prefix} {x} {y} {content}{width_suffix};");
+    ensure_single_entry(&new_raw)?;
     patch.entries[entry_pos].raw = new_raw;
 
     let serialized = serialize(&patch);
