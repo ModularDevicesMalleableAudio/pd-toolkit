@@ -1,6 +1,27 @@
+use crate::errors::PdtkError;
 use pdtk::model::{Entry, EntryKind, Patch};
-use pdtk::parser::assign_depth_and_indices;
+use pdtk::parser::{TokenizeWarning, assign_depth_and_indices, tokenize_entries};
 use std::collections::HashMap;
+
+/// Check that `raw` is exactly one `;`-terminated entry before it is spliced
+/// into a patch.  An entry whose final `;` is escaped (`\;`) or missing would
+/// run on into the next line and silently absorb the following record.
+pub fn ensure_single_entry(raw: &str) -> Result<(), PdtkError> {
+    let tok = tokenize_entries(raw);
+    if tok.warnings.contains(&TokenizeWarning::UnterminatedEntry) {
+        return Err(PdtkError::Usage(format!(
+            "entry is not terminated by an unescaped ';' (a trailing \\; is message \
+             content, not a terminator): {raw}"
+        )));
+    }
+    if tok.entries.len() != 1 {
+        return Err(PdtkError::Usage(format!(
+            "expected exactly one entry, found {}: {raw}",
+            tok.entries.len()
+        )));
+    }
+    Ok(())
+}
 
 /// Whether an entry is an `array define` / `array d` object, which can carry
 /// `#A` saved data.

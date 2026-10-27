@@ -515,3 +515,73 @@ fn insert_into_empty_subpatch_lands_inside_it() {
         "osc~ must land inside shell, before its restore:\n{result}"
     );
 }
+
+#[test]
+fn insert_rejects_entry_whose_final_semicolon_is_escaped() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    for entry in [r"#X msg 10 10 foo \;", "#X obj 10 10 f"] {
+        let out = run_pdtk(&[
+            "insert",
+            tmp.path().to_str().unwrap(),
+            "--depth",
+            "0",
+            "--index",
+            "0",
+            "--entry",
+            entry,
+            "--in-place",
+        ]);
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "entry {entry:?} must be refused"
+        );
+    }
+    assert_eq!(std::fs::read_to_string(tmp.path()).unwrap(), input);
+}
+
+#[test]
+fn insert_rejects_more_than_one_entry() {
+    let f = handcrafted("simple_chain.pd");
+    let out = run_pdtk(&[
+        "insert",
+        f.to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--entry",
+        "#X obj 10 10 f; #X obj 10 40 f;",
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn insert_accepts_message_ending_in_escaped_semicolon() {
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "insert",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "0",
+        "--entry",
+        r"#X msg 10 10 foo \;;",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        result.contains("#X msg 10 10 foo \\;;\n#X obj 50 100 print;\n"),
+        "got:\n{result}"
+    );
+}
