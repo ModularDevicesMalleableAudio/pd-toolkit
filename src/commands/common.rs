@@ -1,7 +1,6 @@
 use crate::errors::PdtkError;
 use pdtk::model::{Entry, EntryKind, Patch};
 use pdtk::parser::{TokenizeWarning, assign_depth_and_indices, tokenize_entries};
-use std::collections::HashMap;
 
 /// Check that `raw` is exactly one `;`-terminated entry before it is spliced
 /// into a patch.  An entry whose final `;` is escaped (`\;`) or missing would
@@ -23,78 +22,11 @@ pub fn ensure_single_entry(raw: &str) -> Result<(), PdtkError> {
     Ok(())
 }
 
-/// Detect entries that have absorbed a following record: a continuation line
-/// that starts with a `#X`/`#N`/`#A` sigil.  This is what a message whose
-/// final `;` is escaped looks like on disk — PD reads the next record as part
-/// of the message, so the object vanishes and later indices shift.  Returns
-/// human-readable messages (empty = no problems found).
-pub fn swallowed_records(patch: &Patch) -> Vec<String> {
-    let mut msgs = Vec::new();
-    for (i, e) in patch.entries.iter().enumerate() {
-        let swallowed = e.raw.lines().skip(1).find(|line| {
-            let line = line.trim_start();
-            ["#X ", "#N ", "#A "].iter().any(|s| line.starts_with(s))
-        });
-        if let Some(line) = swallowed {
-            msgs.push(format!(
-                "entry {i}: contains what looks like another record ({}) — the preceding \
-                 text probably ends in an escaped \\; with no terminating ';'",
-                line.trim()
-            ));
-        }
-    }
-    msgs
-}
-
 /// Post-mutation validation: checks that all connection src/dst indices are
-/// in range for their own canvas.  Sibling subpatches at the same depth have
-/// independent index spaces, so counts are per `canvas_id`, not per depth.
-/// Returns a list of error strings (empty = valid).
+/// in range for their own canvas.  Returns a list of error strings (empty =
+/// valid).
 pub fn validate_patch(patch: &Patch) -> Vec<String> {
-    let mut errors = Vec::new();
-
-    let mut counts_by_canvas: HashMap<usize, usize> = HashMap::new();
-    for e in &patch.entries {
-        if e.object_index.is_some()
-            && let Some(cid) = e.canvas_id
-        {
-            *counts_by_canvas.entry(cid).or_insert(0) += 1;
-        }
-    }
-
-    for e in &patch.entries {
-        if e.kind != EntryKind::Connect {
-            continue;
-        }
-
-        let parts: Vec<&str> = e
-            .raw
-            .trim()
-            .trim_end_matches(';')
-            .split_whitespace()
-            .collect();
-        if parts.len() != 6 {
-            continue;
-        }
-
-        if let (Ok(src), Ok(dst)) = (parts[2].parse::<usize>(), parts[4].parse::<usize>()) {
-            let cid = e.canvas_id.unwrap_or(usize::MAX);
-            let count = counts_by_canvas.get(&cid).copied().unwrap_or(0);
-            let user_depth = e.depth.saturating_sub(1);
-            if src >= count {
-                errors.push(format!(
-                    "depth {user_depth}: connect src {src} out of range (object count {count})"
-                ));
-            }
-            if dst >= count {
-                errors.push(format!(
-                    "depth {user_depth}: connect dst {dst} out of range (object count {count})"
-                ));
-            }
-        }
-    }
-
-    errors
+    pdtk::analysis::check::connection_range_errors(patch)
 }
 
 /// Delete one object at `index` inside `canvas_id` from a raw entry list,

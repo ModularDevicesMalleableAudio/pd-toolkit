@@ -2,7 +2,6 @@ mod cli;
 mod commands;
 mod errors;
 mod io;
-mod types;
 
 use clap::Parser;
 use cli::{Cli, Commands};

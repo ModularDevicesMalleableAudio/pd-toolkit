@@ -89,6 +89,39 @@ fn lint_combines_validate_and_style_results() {
 }
 
 #[test]
+fn lint_runs_the_same_structural_checks_as_validate() {
+    // Mis-bound `#A` data and a record swallowed by an escaped final `;`
+    // are validate warnings; lint must report them identically.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 20 20 array define -k first 2;\n\
+                 #X obj 20 60 array define -k second 2;\n\
+                 #A 0 11 12;\n\
+                 #A 0 21 22;\n\
+                 #X msg 10 10 foo \\;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+    let path = tmp.path().to_str().unwrap();
+
+    let lint: serde_json::Value =
+        serde_json::from_str(&pdtk_output(&["lint", path, "--json"])).unwrap();
+    let validate: serde_json::Value =
+        serde_json::from_str(&stdout_string(&run_pdtk(&["validate", path, "--json"]))).unwrap();
+    let warnings = validate["warnings"].as_array().unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap().contains("overwrite array 'second'"))
+            && warnings
+                .iter()
+                .any(|w| w.as_str().unwrap().contains("looks like another record")),
+        "validate warnings: {warnings:?}"
+    );
+    assert_eq!(lint["warnings"], validate["warnings"]);
+    assert_eq!(lint["errors"], validate["errors"]);
+}
+
+#[test]
 fn lint_all_valid_fixtures_exit_0() {
     let dir = integration::fixture_path("handcrafted");
     for entry in std::fs::read_dir(&dir).unwrap() {

@@ -1,5 +1,6 @@
 use crate::errors::PdtkError;
 use crate::io;
+use pdtk::analysis::check::{Findings, check_patch};
 use pdtk::layout::place::estimate_width;
 use pdtk::layout::{
     crossing::{group_by_layer, reorder},
@@ -11,6 +12,7 @@ use pdtk::model::{Connection, EntryKind};
 use pdtk::parser::parse;
 use serde::Serialize;
 use std::fmt::Write;
+use std::path::Path;
 
 #[derive(Debug, Serialize)]
 struct LintReport {
@@ -36,66 +38,9 @@ pub fn run(
     let input = io::read_patch_lenient(file)?;
     let patch = parse(&input)?;
 
-    let mut errors: Vec<String> = Vec::new();
-    let mut warnings: Vec<String> = patch.warnings.iter().map(|w| format!("{w:?}")).collect();
+    // Structural validation: exactly the checks `validate` runs.
+    let Findings { errors, warnings } = check_patch(&patch, Path::new(file), &input, false);
     let mut style: Vec<String> = Vec::new();
-
-    warnings.extend(pdtk::analysis::array_data::array_data_warnings(
-        &patch.entries,
-    ));
-
-    // --- Structural validation (same as validate command) ---
-
-    let mut balance = 0usize;
-    for (i, e) in patch.entries.iter().enumerate() {
-        match e.kind {
-            EntryKind::CanvasOpen => balance += 1,
-            EntryKind::Restore => {
-                if balance == 0 {
-                    errors.push(format!("entry {i}: restore without canvas open"));
-                } else {
-                    balance -= 1;
-                }
-            }
-            _ => {}
-        }
-    }
-    if balance != 1 {
-        errors.push(format!(
-            "canvas depth imbalance: expected 1 open canvas, got {balance}"
-        ));
-    }
-
-    // Connection ranges are per canvas: sibling subpatches at the same depth
-    // have independent index spaces.
-    let mut counts_by_canvas: std::collections::HashMap<usize, usize> =
-        std::collections::HashMap::default();
-    for e in &patch.entries {
-        if e.object_index.is_some()
-            && let Some(cid) = e.canvas_id
-        {
-            *counts_by_canvas.entry(cid).or_insert(0) += 1;
-        }
-    }
-
-    for e in &patch.entries {
-        if e.kind != EntryKind::Connect {
-            continue;
-        }
-        let Some(conn) = Connection::parse(&e.raw) else {
-            errors.push(format!("malformed connect: {}", e.raw.trim()));
-            continue;
-        };
-        let cid = e.canvas_id.unwrap_or(usize::MAX);
-        let count = counts_by_canvas.get(&cid).copied().unwrap_or(0);
-        let ud = e.depth.saturating_sub(1);
-        if conn.src >= count {
-            errors.push(format!("depth {ud}: src {} out of range", conn.src));
-        }
-        if conn.dst >= count {
-            errors.push(format!("depth {ud}: dst {} out of range", conn.dst));
-        }
-    }
 
     // --- Style / layout checks ---
 
