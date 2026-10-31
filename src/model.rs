@@ -583,6 +583,30 @@ fn is_flag(tok: &str) -> bool {
     tok.starts_with('-') && !is_pd_float(tok)
 }
 
+/// Whether PD sends the `#A` records that follow this entry to the object the
+/// entry creates.
+///
+/// While loading a file PD binds `#A` to the most recently created array,
+/// table, text or scalar container — an `#X array`, `[array define]` (with or
+/// without `-k`), `[table]`, `[text define]` or `[scalar define]`, including
+/// the bare `[array]`/`[text]`/`[scalar]` shorthands — so each such entry takes
+/// every `#A` record up to the next one, wherever in the file it appears.
+#[must_use]
+pub fn takes_array_data(entry: &Entry) -> bool {
+    match entry.kind {
+        EntryKind::Array => true,
+        EntryKind::Obj => match entry.class() {
+            "table" => true,
+            "array" | "text" | "scalar" => entry
+                .args()
+                .first()
+                .is_none_or(|a| matches!(a.as_str(), "define" | "d") || is_pd_float(a)),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 /// Decode an `#A <onset> <value>…;` array-data record into its onset and value
 /// tokens.  Returns `None` for any other entry, or when the onset is not a
 /// non-negative integer.
@@ -847,6 +871,33 @@ mod tests {
                 None,
                 "{text}"
             );
+        }
+    }
+
+    #[test]
+    fn takes_array_data_matches_pd() {
+        let entry = |text: &str| {
+            crate::parser::parse(&format!("#N canvas 0 0 100 100 10;\n#X obj 0 0 {text};\n"))
+                .unwrap()
+                .entries[1]
+                .clone()
+        };
+        // Each of these takes the `#A` records after it (checked against Pd 0.54).
+        for text in [
+            "array",
+            "array 5",
+            "array define a 3",
+            "array d -k",
+            "table tt 3",
+            "text",
+            "text define -k t",
+            "scalar",
+            "scalar define -k float",
+        ] {
+            assert!(takes_array_data(&entry(text)), "{text}");
+        }
+        for text in ["array size a", "array get a", "list", "qlist", "textfile"] {
+            assert!(!takes_array_data(&entry(text)), "{text}");
         }
     }
 

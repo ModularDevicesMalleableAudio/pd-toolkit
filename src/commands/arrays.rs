@@ -190,8 +190,8 @@ pub(crate) fn collect_rows(
         let Ok(patch) = parse(&input) else { continue };
         let file_str = file.display().to_string();
 
-        // An `#A` record binds to the most recently declared array anywhere in
-        // the file, so read the whole file's contents in one pass and attach
+        // An `#A` record binds to the most recently created array (or other
+        // `#A` taker) anywhere in the file, so read the whole file's contents in one pass and attach
         // them by declaration entry index.
         let contents: HashMap<usize, ArrayContents> = if cfg.data {
             array_contents(&patch.entries)

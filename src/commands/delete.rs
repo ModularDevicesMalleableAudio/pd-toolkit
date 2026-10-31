@@ -1,7 +1,7 @@
-use crate::commands::common::{is_array_define, validate_patch};
+use crate::commands::common::validate_patch;
 use crate::errors::PdtkError;
 use crate::io;
-use pdtk::model::EntryKind;
+use pdtk::model::{EntryKind, takes_array_data};
 use pdtk::parser::{assign_depth_and_indices, build_entries, tokenize_entries};
 use pdtk::rewrite::serialize;
 
@@ -57,10 +57,10 @@ pub fn run(
         delete_pos
     };
 
-    // `#A` records bind to the immediately preceding array definition
-    // (classic `#X array` or `array define`); leaving them behind detaches
-    // the saved samples, so they are deleted with the array.
-    if entries[delete_pos].kind == EntryKind::Array || is_array_define(&entries[delete_pos]) {
+    // `#A` records go to the object that takes them (an array, table, text or
+    // scalar container); left behind, PD would send them to whichever such
+    // object precedes it, so they are deleted with their owner.
+    if takes_array_data(&entries[delete_pos]) {
         while end_inclusive + 1 < entries.len()
             && entries[end_inclusive + 1].kind == EntryKind::ArrayData
         {

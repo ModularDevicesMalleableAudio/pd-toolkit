@@ -60,7 +60,8 @@ pub fn run(target: &str, name: &str, cfg: ArrayDataConfig) -> Result<String, Pdt
     if !data.saved() {
         return Err(PdtkError::Usage(format!(
             "array `{name}` in {} saves no contents \
-             (declared without -k / with an even save flag), \
+             (declared without -k / with an even save flag, or its #A records \
+             go to another object — see `pdtk validate`), \
              so PD loads it as {} zeros",
             row.file, row.size
         )));

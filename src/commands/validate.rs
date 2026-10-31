@@ -251,11 +251,11 @@ pub fn run(
         }
     }
 
-    // 5) `#A` array data bound to the wrong array or dropped: records with no
-    //    declaration to attach to, and records that overwrite each other
-    //    because they were written as a block after several declarations.
-    warnings.extend(crate::commands::common::detached_array_data(&patch));
-    warnings.extend(crate::commands::common::misbound_array_data(&patch));
+    // 5) `#A` array data PD drops or loads somewhere other than the file
+    //    suggests.
+    warnings.extend(pdtk::analysis::array_data::array_data_warnings(
+        &patch.entries,
+    ));
 
     let valid = errors.is_empty();
     let exit_code = i32::from(!valid);

@@ -40,7 +40,9 @@ pub fn run(
     let mut warnings: Vec<String> = patch.warnings.iter().map(|w| format!("{w:?}")).collect();
     let mut style: Vec<String> = Vec::new();
 
-    warnings.extend(crate::commands::common::detached_array_data(&patch));
+    warnings.extend(pdtk::analysis::array_data::array_data_warnings(
+        &patch.entries,
+    ));
 
     // --- Structural validation (same as validate command) ---
 
