@@ -316,11 +316,16 @@ mod tests {
     fn non_numeric_tokens_read_as_zero_and_are_reported() {
         let c = contents(concat!(
             "#N canvas 0 22 450 300 12;\n",
-            "#X obj 10 10 array define -k odd 3;\n",
-            "#A 0 1 bang 3;\n",
+            "#X obj 10 10 array define -k odd 4;\n",
+            "#A 0 1 bang 3 inf;\n",
         ));
-        assert_eq!(c[0].values, vec![1.0, 0.0, 3.0]);
-        assert_eq!(c[0].non_numeric, vec!["bang".to_string()]);
+        // PD reads `inf` as a symbol too, so it loads as 0 (checked against
+        // Pd 0.54), even though Rust parses it as a float.
+        assert_eq!(c[0].values, vec![1.0, 0.0, 3.0, 0.0]);
+        assert_eq!(
+            c[0].non_numeric,
+            vec!["bang".to_string(), "inf".to_string()]
+        );
     }
 
     #[test]

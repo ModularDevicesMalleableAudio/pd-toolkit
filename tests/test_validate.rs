@@ -615,10 +615,10 @@ fn validate_does_not_warn_on_chunked_array_data() {
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(out.status.code(), Some(0));
-    let s = stdout_string(&out);
-    assert!(
-        !s.contains("overwrite"),
-        "chunked data must not warn; got:\n{s}"
+    assert_eq!(
+        stdout_string(&out).trim(),
+        "OK: patch is valid",
+        "chunked data must not warn"
     );
 }
 

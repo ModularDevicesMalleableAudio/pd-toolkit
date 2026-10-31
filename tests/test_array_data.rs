@@ -151,4 +151,7 @@ fn fractional_values_survive_the_round_trip() {
         out.lines().collect::<Vec<_>>(),
         vec!["0 0.5", "1 -1.25", "2 2"]
     );
+    let out = pdtk_output(&["array-data", f.to_str().unwrap(), "floats", "--json"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["data"]["values"], serde_json::json!([0.5, -1.25, 2]));
 }
