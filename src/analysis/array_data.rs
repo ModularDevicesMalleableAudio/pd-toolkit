@@ -1,6 +1,4 @@
-use crate::model::{
-    ArrayDecl, ArrayDeclParse, Entry, EntryKind, parse_array_data, parse_array_decl,
-};
+use crate::model::{ArrayDecl, Entry, EntryKind, parse_array_data, parse_array_decl};
 
 /// The saved contents of one declared array.
 #[derive(Debug, Clone, PartialEq)]
@@ -83,7 +81,7 @@ pub fn array_contents(entries: &[Entry]) -> Vec<ArrayContents> {
             }
             continue;
         }
-        if let ArrayDeclParse::Decl(decl) = parse_array_decl(&e.raw) {
+        if let Some(decl) = parse_array_decl(&e.raw) {
             out.push(ArrayContents {
                 decl,
                 entry: i,
@@ -258,5 +256,24 @@ mod tests {
         ));
         assert_eq!(c.len(), 1);
         assert!(!c[0].saved());
+    }
+
+    #[test]
+    fn array_define_without_a_size_takes_its_own_data() {
+        // PD gives `[array define -k second]` 100 elements and sends it the
+        // records that follow; they must not pile onto `first` (checked
+        // against Pd 0.54).
+        let c = contents(concat!(
+            "#N canvas 0 22 450 300 12;\n",
+            "#X obj 10 10 array define -k first 3;\n",
+            "#A 0 1 2 3;\n",
+            "#X obj 10 50 array define -k second;\n",
+            "#A 0 7 8 9 10;\n",
+        ));
+        assert_eq!(c[0].values, vec![1.0, 2.0, 3.0]);
+        assert_eq!(c[0].overflow, 0);
+        assert_eq!(c[1].decl.name, "second");
+        assert_eq!(c[1].decl.size, 100);
+        assert_eq!(c[1].values, vec![7.0, 8.0, 9.0, 10.0]);
     }
 }

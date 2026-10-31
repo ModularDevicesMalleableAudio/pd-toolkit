@@ -1,7 +1,7 @@
 use crate::errors::PdtkError;
 use crate::io;
 use pdtk::analysis::array_data::{ArrayContents, array_contents};
-use pdtk::model::{ArrayDeclParse, ArrayKind, EntryKind, parse_array_decl};
+use pdtk::model::{ArrayKind, EntryKind, parse_array_decl};
 use pdtk::parser::parse;
 use serde_json::{Number, Value, json};
 use std::collections::{BTreeMap, HashMap};
@@ -229,21 +229,11 @@ pub(crate) fn collect_rows(
                     }
                 }
                 EntryKind::Obj => {
-                    if let Some(parsed) =
+                    if let Some(mut row) =
                         parse_define(&e.raw, &file_str, e.depth, e.object_index, cfg.verbose)
                     {
-                        match parsed {
-                            DefineParse::Row(row) => {
-                                let mut row = *row;
-                                row.data = contents.get(&entry_index).cloned();
-                                rows.push(row);
-                            }
-                            DefineParse::Malformed(msg) => {
-                                if cfg.verbose {
-                                    eprintln!("warning: {file_str}: {msg}");
-                                }
-                            }
-                        }
+                        row.data = contents.get(&entry_index).cloned();
+                        rows.push(row);
                     }
                 }
                 _ => {}
@@ -295,19 +285,9 @@ pub(crate) fn collect_rows(
     Ok(rows)
 }
 
-enum DefineParse {
-    Row(Box<Row>),
-    Malformed(String),
-}
-
 /// Parse an `#X array name N float K;` entry.
 fn parse_classic(raw: &str, file: &str, internal_depth: usize) -> Option<Row> {
-    let ArrayDeclParse::Decl(decl) = parse_array_decl(raw) else {
-        return None;
-    };
-    if decl.kind != ArrayKind::Classic {
-        return None;
-    }
+    let decl = parse_array_decl(raw).filter(|d| d.kind == ArrayKind::Classic)?;
     // `#X array <name> <size> float K` — the save flag follows the `float`
     // element-type token.
     let save_flag: Option<i64> = decl.extra.get(1).and_then(|s| s.parse::<i64>().ok());
@@ -364,23 +344,24 @@ fn parse_coords(raw: &str) -> Option<Value> {
 }
 
 /// Try to parse an `#X obj ... array (define|d) ...` entry.  Returns `None` if
-/// this entry is not an `array define`/`array d` declaration.
+/// this entry is not an `array define`/`array d` declaration, or declares an
+/// anonymous array (there is no name to report).
 fn parse_define(
     raw: &str,
     file: &str,
     internal_depth: usize,
     object_index: Option<usize>,
     verbose: bool,
-) -> Option<DefineParse> {
-    // #X obj X Y array (define|d) [flags...] <name> <size>
-    let decl = match parse_array_decl(raw) {
-        ArrayDeclParse::NotArray => return None,
-        ArrayDeclParse::Malformed(reason) => {
-            return Some(DefineParse::Malformed(format!("{reason}: {}", raw.trim())));
+) -> Option<Row> {
+    // #X obj X Y array (define|d) [flags...] [<name>] [<size>]
+    let decl = parse_array_decl(raw).filter(|d| d.kind == ArrayKind::Define)?;
+    if decl.name.is_empty() {
+        if verbose {
+            eprintln!(
+                "note: {file}: anonymous array define skipped: {}",
+                raw.trim()
+            );
         }
-        ArrayDeclParse::Decl(d) => d,
-    };
-    if decl.kind != ArrayKind::Define {
         return None;
     }
     let flag_toks: Vec<&str> = decl.extra.iter().map(String::as_str).collect();
@@ -519,7 +500,7 @@ fn parse_define(
         }
     }
 
-    Some(DefineParse::Row(Box::new(Row {
+    Some(Row {
         file: file.to_string(),
         depth: internal_depth.saturating_sub(1),
         index: object_index,
@@ -531,7 +512,7 @@ fn parse_define(
         classic: None,
         graph: None,
         data: None,
-    })))
+    })
 }
 
 /// Parse a numeric token for `-yrange`/`-pix`.  Emits an integer-typed

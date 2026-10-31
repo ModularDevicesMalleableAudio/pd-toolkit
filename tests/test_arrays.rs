@@ -475,29 +475,57 @@ fn arrays_d_synonym_parses_identically() {
 // ---------- malformed inputs ----------
 
 #[test]
-fn arrays_define_missing_size_is_skipped() {
+fn arrays_define_without_size_gets_pd_default() {
+    // PD gives an `array define` with no size (or one below 1) 100 elements
+    // (verified against Pd 0.54).
     let dir = tempfile::tempdir().unwrap();
-    let p = dir.path().join("bad.pd");
+    let p = dir.path().join("nosize.pd");
     std::fs::write(
         &p,
-        "#N canvas 0 0 100 100 10;\n#X obj 50 50 array define lonely;\n",
+        "#N canvas 0 0 100 100 10;\n\
+         #X obj 50 50 array define lonely;\n\
+         #X obj 50 80 array define -k zero 0;\n",
     )
     .unwrap();
     let out = pdtk_output(&["arrays", p.to_str().unwrap(), "--kind=define", "--json"]);
     let v: Value = serde_json::from_str(&out).unwrap();
-    assert!(v["arrays"].as_array().unwrap().is_empty());
+    let arrays = v["arrays"].as_array().unwrap();
+    assert_eq!(arrays.len(), 2);
+    let lonely = arrays.iter().find(|r| r["name"] == "lonely").unwrap();
+    assert_eq!(lonely["size"], 100);
+    let zero = arrays.iter().find(|r| r["name"] == "zero").unwrap();
+    assert_eq!(zero["size"], 100);
+    assert_eq!(zero["define"]["k"], true);
 }
 
 #[test]
-fn arrays_define_non_integer_size_is_skipped() {
+fn arrays_define_ignores_tokens_after_the_size() {
+    // PD reads flags, then name, then size, and ignores what follows — a
+    // trailing `-k` does not make the array keep its contents.
     let dir = tempfile::tempdir().unwrap();
-    let p = dir.path().join("bad.pd");
+    let p = dir.path().join("trailing.pd");
     std::fs::write(
         &p,
         "#N canvas 0 0 100 100 10;\n#X obj 50 50 array define foo 16 -k;\n",
     )
     .unwrap();
-    // Right-anchored: trailing -k means size_tok = "-k", not an integer.
+    let out = pdtk_output(&["arrays", p.to_str().unwrap(), "--kind=define", "--json"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let row = &v["arrays"][0];
+    assert_eq!(row["name"], "foo");
+    assert_eq!(row["size"], 16);
+    assert_eq!(row["define"]["k"], false);
+}
+
+#[test]
+fn arrays_skips_anonymous_array_define() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("anon.pd");
+    std::fs::write(
+        &p,
+        "#N canvas 0 0 100 100 10;\n#X obj 50 50 array define -k;\n#X obj 50 80 array 8;\n",
+    )
+    .unwrap();
     let out = pdtk_output(&["arrays", p.to_str().unwrap(), "--kind=define", "--json"]);
     let v: Value = serde_json::from_str(&out).unwrap();
     assert!(v["arrays"].as_array().unwrap().is_empty());
