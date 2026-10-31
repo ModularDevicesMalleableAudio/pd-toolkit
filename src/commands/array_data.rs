@@ -1,6 +1,5 @@
 use crate::commands::arrays::{
     ArraysConfig, KindFilter, Row, Schema, TemplateFilter, collect_rows, data_to_json,
-    format_number,
 };
 use crate::errors::PdtkError;
 use serde_json::json;
@@ -90,7 +89,7 @@ pub fn run(target: &str, name: &str, cfg: ArrayDataConfig) -> Result<String, Pdt
     }
     let mut out = String::new();
     for (i, v) in data.values.iter().enumerate() {
-        let _ = writeln!(out, "{i} {}", format_number(*v));
+        let _ = writeln!(out, "{i} {v}");
     }
     Ok(out.trim_end().to_string())
 }

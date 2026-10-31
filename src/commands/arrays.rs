@@ -571,14 +571,6 @@ pub(crate) fn json_number(v: f64) -> Value {
     Number::from_f64(v).map_or(Value::Null, Value::Number)
 }
 
-/// Render a PD float as text, keeping whole numbers integral.
-pub(crate) fn format_number(v: f64) -> String {
-    if v.fract() == 0.0 && v.abs() < 9.007_199_254_740_992e15 {
-        return format!("{}", v as i64);
-    }
-    format!("{v}")
-}
-
 fn render(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> String {
     if cfg.json {
         return render_json(rows, cfg);
@@ -790,8 +782,7 @@ fn render_text(rows: &[Row], cfg: &ArraysConfig, kind_filter: KindFilter) -> Str
                 out.push('\n');
                 if let Some(d) = &r.data {
                     if d.saved() {
-                        let values: Vec<String> =
-                            d.values.iter().copied().map(format_number).collect();
+                        let values: Vec<String> = d.values.iter().map(f64::to_string).collect();
                         let _ = writeln!(out, "  data: {}", values.join(" "));
                     } else {
                         out.push_str("  data: none saved\n");
