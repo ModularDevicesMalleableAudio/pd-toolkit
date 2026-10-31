@@ -178,8 +178,9 @@ the exit code. Only structural errors fail lint.
 PD saves an array's values as `#A <onset> <value>…;` records that follow the
 declaration. `arrays --data` and `array-data` decode them with PD's own rules:
 
-- A record binds to the **most recently declared** array anywhere in the file,
-  not to the nearest one structurally and not scoped to a canvas.
+- A record binds to the **most recently created** array — or `[table]`,
+  `[text define]` or `[scalar define]`, which take `#A` records too — anywhere
+  in the file, not to the nearest one structurally and not scoped to a canvas.
 - One array's values may span several records (PD writes long arrays in
   chunks), each carrying the onset of its first value — the first number after
   `#A` is an index, not a value. Hand-transcribing a table into code and
@@ -189,9 +190,9 @@ declaration. `arrays --data` and `array-data` decode them with PD's own rules:
   as an error rather than printing an empty table.
 - Values past the declared size are discarded, as PD does when loading.
 
-`validate` warns when a file breaks these rules — most usefully when `#A`
-records were written as a block after a run of declarations instead of after
-the array each belongs to. PD loads that as "last record wins, every earlier
+`validate` (and `lint`) warns when a file breaks these rules — most usefully
+when `#A` records were written as a block after a run of declarations instead
+of after the array each belongs to. PD loads that as "last record wins, every earlier
 array zero", which is invisible until something reads the data:
 
 ```

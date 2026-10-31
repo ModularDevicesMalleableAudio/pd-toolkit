@@ -461,56 +461,45 @@ pub enum ArrayKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArrayDecl {
     pub kind: ArrayKind,
-    /// Array name with PD escapes resolved (`\$1` → `$1`).
+    /// Array name with PD escapes resolved (`\$1` → `$1`).  Empty for an
+    /// anonymous `array define`, which PD creates but nothing can name.
     pub name: String,
-    /// Declared element count.
+    /// Element count PD allocates.  An `array define` without a size, or with
+    /// one below 1, gets PD's default of 100; a fractional size is truncated.
     pub size: usize,
     /// Kind-specific remaining tokens: for `Define` the flag tokens preceding
     /// the name/size pair (`-k`, `-yrange lo hi`, …); for `Classic` the tokens
-    /// following the size (`float K`).
+    /// following the size (`float K`).  Trailing tokens PD ignores after an
+    /// `array define` size are not included.
     pub extra: Vec<String>,
 }
 
-/// Outcome of decoding one entry as an array declaration.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ArrayDeclParse {
-    /// The entry does not declare an array.
-    NotArray,
-    /// The entry declares an array but cannot be decoded; the payload is a
-    /// human-readable reason (without the offending raw entry).
-    Malformed(String),
-    Decl(ArrayDecl),
-}
+/// The size PD gives an `array define` that declares none (or one below 1).
+pub const DEFAULT_ARRAY_DEFINE_SIZE: usize = 100;
 
 /// Decode an array declaration — either a classic `#X array name size …` entry
-/// or an `array define` / `array d` object — into its kind, name, size and
-/// kind-specific extra tokens.
+/// or an `array define` / `array d` object (including the bare `[array]` and
+/// `[array N]` shorthands) — into its kind, name, size and kind-specific extra
+/// tokens.  Returns `None` for anything else, including a classic `#X array`
+/// entry too malformed to read.
 ///
 /// This is the single decoder for "what array does this entry declare"; the
 /// `arrays` command layers flag parsing on top of it, and `#A` data binding
 /// (`analysis::array_data`) uses it to find the arrays data attaches to.
 #[must_use]
-pub fn parse_array_decl(raw: &str) -> ArrayDeclParse {
+pub fn parse_array_decl(raw: &str) -> Option<ArrayDecl> {
     let toks: Vec<&str> = content_without_width_hint(raw).split_whitespace().collect();
-    if toks.len() < 2 || toks[0] != "#X" {
-        return ArrayDeclParse::NotArray;
-    }
-    match toks[1] {
-        "array" => parse_classic_decl(&toks),
-        "obj" => parse_define_decl(&toks),
-        _ => ArrayDeclParse::NotArray,
+    match toks.get(..2)? {
+        ["#X", "array"] => parse_classic_decl(&toks),
+        ["#X", "obj"] => parse_define_decl(&toks),
+        _ => None,
     }
 }
 
 /// `#X array <name> <size> [float K]`
-fn parse_classic_decl(toks: &[&str]) -> ArrayDeclParse {
-    if toks.len() < 4 {
-        return ArrayDeclParse::Malformed("malformed #X array entry".to_string());
-    }
-    let Ok(size) = toks[3].parse::<usize>() else {
-        return ArrayDeclParse::Malformed("malformed #X array entry".to_string());
-    };
-    ArrayDeclParse::Decl(ArrayDecl {
+fn parse_classic_decl(toks: &[&str]) -> Option<ArrayDecl> {
+    let size = toks.get(3)?.parse::<usize>().ok()?;
+    Some(ArrayDecl {
         kind: ArrayKind::Classic,
         name: crate::parser::escape::unescape_pd_token(toks[2]),
         size,
@@ -518,36 +507,104 @@ fn parse_classic_decl(toks: &[&str]) -> ArrayDeclParse {
     })
 }
 
-/// `#X obj X Y array (define|d) [flags…] <name> <size>`
-fn parse_define_decl(toks: &[&str]) -> ArrayDeclParse {
-    if toks.len() < 6 || toks[4] != "array" || (toks[5] != "define" && toks[5] != "d") {
-        return ArrayDeclParse::NotArray;
+/// `#X obj X Y array (define|d) [flags…] [<name>] [<size>]`, or `[array]` /
+/// `[array N]`, which PD also creates as `array define`.
+///
+/// Name and size are read the way PD reads them — leading flags, then an
+/// optional name, then an optional size, ignoring anything after — unless the
+/// flags include one PD does not know.  The arity of an unknown flag cannot be
+/// guessed, so then name and size are taken from the right instead, where an
+/// unknown flag's arguments cannot shift them.
+fn parse_define_decl(toks: &[&str]) -> Option<ArrayDecl> {
+    if toks.get(4) != Some(&"array") {
+        return None;
     }
-    let args = &toks[6..];
-    if args.len() < 2 {
-        return ArrayDeclParse::Malformed(format!(
-            "malformed `array {}` (need at least <name> <size>)",
-            toks[5]
-        ));
-    }
-    // Right-anchored: the last two args are always name and size, so unknown
-    // flags cannot shift them.
-    let size_tok = args[args.len() - 1];
-    let Ok(size) = size_tok.parse::<usize>() else {
-        return ArrayDeclParse::Malformed(format!(
-            "malformed `array {}` (size `{}` is not an integer)",
-            toks[5], size_tok
-        ));
+    let args = match toks.get(5) {
+        Some(&("define" | "d")) => &toks[6..],
+        Some(t) if !is_pd_float(t) => return None,
+        _ => &toks[5..],
     };
-    ArrayDeclParse::Decl(ArrayDecl {
+
+    let mut i = 0;
+    loop {
+        match args.get(i) {
+            Some(&"-k") => i += 1,
+            Some(&("-yrange" | "-pix"))
+                if args.len() > i + 2 && is_pd_float(args[i + 1]) && is_pd_float(args[i + 2]) =>
+            {
+                i += 3;
+            }
+            _ => break,
+        }
+    }
+    let rest = &args[i..];
+
+    let (name, size, flags_end) = if rest.first().is_some_and(|t| is_flag(t)) {
+        // `rest[0]` is a flag, so a trailing size always has a token before it.
+        let size = rest.last().copied().filter(|t| is_pd_float(t));
+        let name_pos = match size {
+            Some(_) => Some(rest.len() - 2),
+            None => Some(rest.len() - 1).filter(|&p| !is_flag(rest[p])),
+        };
+        let pair_start = name_pos.unwrap_or(rest.len());
+        (name_pos.map(|p| rest[p]), size, i + pair_start)
+    } else {
+        let name = rest.first().copied().filter(|t| !is_pd_float(t));
+        let size = rest
+            .get(usize::from(name.is_some()))
+            .copied()
+            .filter(|t| is_pd_float(t));
+        (name, size, i)
+    };
+
+    // PD truncates a fractional size and replaces one below 1 with its default.
+    #[allow(clippy::cast_sign_loss)] // only sizes >= 1.0 are cast
+    let size = size
+        .and_then(|t| t.parse::<f64>().ok())
+        .map(f64::trunc)
+        .filter(|&n| n >= 1.0)
+        .map_or(DEFAULT_ARRAY_DEFINE_SIZE, |n| n as usize);
+    Some(ArrayDecl {
         kind: ArrayKind::Define,
-        name: crate::parser::escape::unescape_pd_token(args[args.len() - 2]),
+        name: name.map_or_else(String::new, crate::parser::escape::unescape_pd_token),
         size,
-        extra: args[..args.len() - 2]
-            .iter()
-            .map(|s| (*s).to_string())
-            .collect(),
+        extra: args[..flags_end].iter().map(|s| (*s).to_string()).collect(),
     })
+}
+
+/// Whether PD reads `tok` as a float atom rather than a symbol.
+fn is_pd_float(tok: &str) -> bool {
+    tok.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '-' | '+' | '.'))
+        && tok.parse::<f64>().is_ok_and(f64::is_finite)
+}
+
+/// Whether `tok` is a `-flag` symbol (not a negative number).
+fn is_flag(tok: &str) -> bool {
+    tok.starts_with('-') && !is_pd_float(tok)
+}
+
+/// Whether PD sends the `#A` records that follow this entry to the object the
+/// entry creates.
+///
+/// While loading a file PD binds `#A` to the most recently created array,
+/// table, text or scalar container — an `#X array`, `[array define]` (with or
+/// without `-k`), `[table]`, `[text define]` or `[scalar define]`, including
+/// the bare `[array]`/`[text]`/`[scalar]` shorthands — so each such entry takes
+/// every `#A` record up to the next one, wherever in the file it appears.
+#[must_use]
+pub fn takes_array_data(entry: &Entry) -> bool {
+    match entry.kind {
+        EntryKind::Array => true,
+        EntryKind::Obj => match entry.class() {
+            "table" => true,
+            "array" | "text" | "scalar" => entry
+                .args()
+                .first()
+                .is_none_or(|a| matches!(a.as_str(), "define" | "d") || is_pd_float(a)),
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 /// Decode an `#A <onset> <value>…;` array-data record into its onset and value
@@ -786,6 +843,62 @@ mod tests {
         assert_eq!(trailing_width_hint("t b b b b, f 200"), Some(200));
         assert_eq!(trailing_width_hint("t b b b b"), None);
         assert_eq!(content_without_width_hint("t b b b b, f 200"), "t b b b b");
+    }
+
+    #[test]
+    fn parse_array_decl_reads_array_define_as_pd_does() {
+        // (box text, name, size), each checked against Pd 0.54.
+        let cases = [
+            ("array define -k foo", "foo", 100),
+            ("array define -yrange 0 10 foo 5", "foo", 5),
+            ("array define foo 5 extra", "foo", 5),
+            ("array define -k foo bar", "foo", 100),
+            ("array d foo -5", "foo", 100),
+            ("array define foo 2.7", "foo", 2),
+            ("array define -k foo 0", "foo", 100),
+            ("array define", "", 100),
+        ];
+        for (text, name, size) in cases {
+            let d = parse_array_decl(&format!("#X obj 0 0 {text};")).unwrap();
+            assert_eq!(d.kind, ArrayKind::Define, "{text}");
+            assert_eq!((d.name.as_str(), d.size), (name, size), "{text}");
+        }
+        let bare = parse_array_decl("#X obj 0 0 array 8;").unwrap();
+        assert_eq!((bare.name.as_str(), bare.size), ("", 8));
+        for text in ["array get foo", "array -k foo 5", "text define t"] {
+            assert_eq!(
+                parse_array_decl(&format!("#X obj 0 0 {text};")),
+                None,
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn takes_array_data_matches_pd() {
+        let entry = |text: &str| {
+            crate::parser::parse(&format!("#N canvas 0 0 100 100 10;\n#X obj 0 0 {text};\n"))
+                .unwrap()
+                .entries[1]
+                .clone()
+        };
+        // Each of these takes the `#A` records after it (checked against Pd 0.54).
+        for text in [
+            "array",
+            "array 5",
+            "array define a 3",
+            "array d -k",
+            "table tt 3",
+            "text",
+            "text define -k t",
+            "scalar",
+            "scalar define -k float",
+        ] {
+            assert!(takes_array_data(&entry(text)), "{text}");
+        }
+        for text in ["array size a", "array get a", "list", "qlist", "textfile"] {
+            assert!(!takes_array_data(&entry(text)), "{text}");
+        }
     }
 
     #[test]

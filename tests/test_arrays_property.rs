@@ -57,9 +57,11 @@ proptest! {
         prop_assert_eq!(arrays.len(), 1);
         let r = &arrays[0];
 
-        // (1) name and size always correct.
+        // (1) name and size always correct (PD replaces a size below 1 with
+        //     its default of 100).
         prop_assert_eq!(r["name"].as_str().unwrap(), &name);
-        prop_assert_eq!(r["size"].as_u64().unwrap(), u64::from(size));
+        let expected_size = if size == 0 { 100 } else { u64::from(size) };
+        prop_assert_eq!(r["size"].as_u64().unwrap(), expected_size);
 
         let d = &r["define"];
         let has_unknown = !unknowns.is_empty();

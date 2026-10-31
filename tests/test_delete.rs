@@ -1037,3 +1037,41 @@ fn delete_array_define_removes_attached_array_data() {
         "attached array data must be deleted with the define:\n{result}"
     );
 }
+
+#[test]
+fn delete_text_define_removes_its_saved_contents() {
+    // A `text define -k` saves its contents as a following `#A set …`; left
+    // behind, PD would send that record to whatever precedes it.
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 50 50 array define -k arr 2;\n\
+                 #A 0 1 2;\n\
+                 #X obj 50 80 text define -k notes;\n\
+                 #A set 60 62 \\;;\n\
+                 #X obj 50 100 print;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    pdtk_output(&[
+        "delete",
+        tmp.path().to_str().unwrap(),
+        "--depth",
+        "0",
+        "--index",
+        "1",
+        "--in-place",
+    ]);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(
+        !result.contains("text define"),
+        "text must be deleted:\n{result}"
+    );
+    assert!(
+        !result.contains("#A set"),
+        "saved contents must be deleted with the text:\n{result}"
+    );
+    assert!(
+        result.contains("#A 0 1 2;"),
+        "the array keeps its data:\n{result}"
+    );
+}

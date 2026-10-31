@@ -1,5 +1,6 @@
 use crate::model::{
-    ArrayDecl, ArrayDeclParse, Entry, EntryKind, parse_array_data, parse_array_decl,
+    ArrayDecl, Entry, EntryKind, content_without_width_hint, parse_array_data, parse_array_decl,
+    takes_array_data,
 };
 
 /// The saved contents of one declared array.
@@ -55,50 +56,152 @@ impl ArrayContents {
     }
 }
 
-/// Read the saved contents of every array declared in `entries`.
+/// Where a patch's `#A` records go when PD loads it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArrayDataBinding {
+    /// Every declared array in document order, with the contents PD loads into
+    /// it — including arrays with no saved data (`records == 0`).
+    pub arrays: Vec<ArrayContents>,
+    /// Entry indices of `#A` records that precede every object able to take
+    /// them, so PD drops them.
+    pub unbound: Vec<usize>,
+    /// `(record, taker)` entry indices of `#A <onset> …` value records taken by
+    /// an object that is not a declared array — a `[table]`, `[text define]`
+    /// or `[scalar define]` — so no declared array receives the values.
+    /// Records in other forms (the `#A set …` a `text define -k` saves) are
+    /// that object's own contents and are not listed.
+    pub foreign: Vec<(usize, usize)>,
+}
+
+/// Bind every `#A` record in `entries` the way PD's file loader does.
 ///
-/// An `#A` record binds to the most recently declared array, exactly as PD's
-/// file loader does — not to the array nearest in the file structure, and not
-/// scoped to a canvas. A single array's data may span several `#A` records,
-/// each carrying the onset of its first value (PD writes them in chunks), so
-/// records are applied at their onset rather than appended.
-///
-/// Every declaration is returned in document order, including arrays with no
-/// saved data (`records == 0`); an `#A` record that precedes any declaration
-/// is ignored (`validate` reports those as detached).
+/// PD sends an `#A` record to the most recently created object that takes
+/// them (see `model::takes_array_data`) — not to the array nearest in the
+/// file structure, and not scoped to a canvas. A single array's data may span
+/// several `#A` records, each carrying the onset of its first value (PD writes
+/// them in chunks), so records are applied at their onset rather than
+/// appended.
 #[must_use]
-pub fn array_contents(entries: &[Entry]) -> Vec<ArrayContents> {
-    let mut out: Vec<ArrayContents> = Vec::new();
+pub fn bind_array_data(entries: &[Entry]) -> ArrayDataBinding {
+    enum Taker {
+        Nothing,
+        Array(usize),
+        Other(usize),
+    }
+    let mut binding = ArrayDataBinding::default();
+    let mut taker = Taker::Nothing;
     // End (exclusive) of the previously applied record, for overlap detection.
     let mut previous_end = 0usize;
     for (i, e) in entries.iter().enumerate() {
         if e.kind == EntryKind::ArrayData {
-            if let Some(target) = out.last_mut()
-                && let Some((onset, end)) = apply_record(target, &e.raw)
-            {
-                if onset < previous_end {
-                    target.overlapping_records += 1;
+            match taker {
+                Taker::Array(a) => {
+                    let target = &mut binding.arrays[a];
+                    if let Some((onset, end)) = apply_record(target, &e.raw) {
+                        if onset < previous_end {
+                            target.overlapping_records += 1;
+                        }
+                        previous_end = end;
+                    }
                 }
-                previous_end = end;
+                Taker::Other(t) => {
+                    if parse_array_data(&e.raw).is_some() {
+                        binding.foreign.push((i, t));
+                    }
+                }
+                Taker::Nothing => binding.unbound.push(i),
             }
             continue;
         }
-        if let ArrayDeclParse::Decl(decl) = parse_array_decl(&e.raw) {
-            out.push(ArrayContents {
-                decl,
-                entry: i,
-                depth: e.depth,
-                canvas_id: e.canvas_id,
-                values: Vec::new(),
-                records: 0,
-                overlapping_records: 0,
-                overflow: 0,
-                non_numeric: Vec::new(),
-            });
-            previous_end = 0;
+        if !takes_array_data(e) {
+            continue;
+        }
+        previous_end = 0;
+        taker = match parse_array_decl(&e.raw) {
+            Some(decl) => {
+                binding.arrays.push(ArrayContents {
+                    decl,
+                    entry: i,
+                    depth: e.depth,
+                    canvas_id: e.canvas_id,
+                    values: Vec::new(),
+                    records: 0,
+                    overlapping_records: 0,
+                    overflow: 0,
+                    non_numeric: Vec::new(),
+                });
+                Taker::Array(binding.arrays.len() - 1)
+            }
+            None => Taker::Other(i),
+        };
+    }
+    binding
+}
+
+/// Read the saved contents of every array declared in `entries`, in document
+/// order (see `bind_array_data`).
+#[must_use]
+pub fn array_contents(entries: &[Entry]) -> Vec<ArrayContents> {
+    bind_array_data(entries).arrays
+}
+
+/// Warnings for `#A` records PD will not load the way the file reads: records
+/// nothing takes, value records taken by a non-array object, records that
+/// overwrite each other because they were written as a block after several
+/// declarations, and values past an array's declared size. Returns
+/// human-readable messages (empty = no problems found).
+#[must_use]
+pub fn array_data_warnings(entries: &[Entry]) -> Vec<String> {
+    let binding = bind_array_data(entries);
+    let mut msgs = Vec::new();
+    for &i in &binding.unbound {
+        msgs.push(format!(
+            "entry {i}: #A array data not attached to an array definition: {}",
+            entries[i].raw.trim()
+        ));
+    }
+    for &(i, t) in &binding.foreign {
+        let tokens: Vec<&str> = content_without_width_hint(&entries[t].raw)
+            .split_whitespace()
+            .collect();
+        // Show an object as its box text (`table tt 3`), anything else whole.
+        let skip = if entries[t].kind == EntryKind::Obj {
+            4
+        } else {
+            0
+        };
+        let taker = tokens.get(skip..).unwrap_or_default().join(" ");
+        msgs.push(format!(
+            "entry {i}: #A array data goes to [{taker}] (entry {t}), the most recent object \
+             that takes #A records, not to an array — put each record directly after the \
+             array it belongs to"
+        ));
+    }
+    for c in &binding.arrays {
+        let user_depth = c.depth.saturating_sub(1);
+        let name = if c.decl.name.is_empty() {
+            "(anonymous)".to_string()
+        } else {
+            format!("'{}'", c.decl.name)
+        };
+        if c.overlapping_records > 0 {
+            msgs.push(format!(
+                "depth {user_depth}: {} of {} #A record(s) overwrite array {name} \
+                 (each starts before the previous ended) — PD sends each #A record \
+                 to the most recent array, table, text or scalar define before it, \
+                 so put each record directly after the array it belongs to",
+                c.overlapping_records, c.records
+            ));
+        }
+        if c.overflow > 0 {
+            msgs.push(format!(
+                "depth {user_depth}: array {name} has size {} but its #A data supplies \
+                 {} more value(s), which PD discards",
+                c.decl.size, c.overflow
+            ));
         }
     }
-    out
+    msgs
 }
 
 /// Apply one `#A` record's values into `target` at the record's onset.
@@ -213,11 +316,16 @@ mod tests {
     fn non_numeric_tokens_read_as_zero_and_are_reported() {
         let c = contents(concat!(
             "#N canvas 0 22 450 300 12;\n",
-            "#X obj 10 10 array define -k odd 3;\n",
-            "#A 0 1 bang 3;\n",
+            "#X obj 10 10 array define -k odd 4;\n",
+            "#A 0 1 bang 3 inf;\n",
         ));
-        assert_eq!(c[0].values, vec![1.0, 0.0, 3.0]);
-        assert_eq!(c[0].non_numeric, vec!["bang".to_string()]);
+        // PD reads `inf` as a symbol too, so it loads as 0 (checked against
+        // Pd 0.54), even though Rust parses it as a float.
+        assert_eq!(c[0].values, vec![1.0, 0.0, 3.0, 0.0]);
+        assert_eq!(
+            c[0].non_numeric,
+            vec!["bang".to_string(), "inf".to_string()]
+        );
     }
 
     #[test]
@@ -250,13 +358,68 @@ mod tests {
     }
 
     #[test]
-    fn detached_data_before_any_declaration_is_ignored() {
-        let c = contents(concat!(
+    fn detached_data_before_any_declaration_is_unbound() {
+        let entries = parse(concat!(
             "#N canvas 0 22 450 300 12;\n",
             "#A 0 1 2 3;\n",
             "#X obj 10 10 array define -k later 2;\n",
+        ))
+        .unwrap()
+        .entries;
+        let b = bind_array_data(&entries);
+        assert_eq!(b.arrays.len(), 1);
+        assert!(!b.arrays[0].saved());
+        assert_eq!(b.unbound, vec![1]);
+    }
+
+    #[test]
+    fn array_define_without_a_size_takes_its_own_data() {
+        // PD gives `[array define -k second]` 100 elements and sends it the
+        // records that follow; they must not pile onto `first` (checked
+        // against Pd 0.54).
+        let c = contents(concat!(
+            "#N canvas 0 22 450 300 12;\n",
+            "#X obj 10 10 array define -k first 3;\n",
+            "#A 0 1 2 3;\n",
+            "#X obj 10 50 array define -k second;\n",
+            "#A 0 7 8 9 10;\n",
         ));
-        assert_eq!(c.len(), 1);
-        assert!(!c[0].saved());
+        assert_eq!(c[0].values, vec![1.0, 2.0, 3.0]);
+        assert_eq!(c[0].overflow, 0);
+        assert_eq!(c[1].decl.name, "second");
+        assert_eq!(c[1].decl.size, 100);
+        assert_eq!(c[1].values, vec![7.0, 8.0, 9.0, 10.0]);
+    }
+
+    #[test]
+    fn records_after_a_table_or_text_go_to_it_not_the_array() {
+        // `[table]` and `[text define]` take `#A` records too, so the array
+        // declared before them loads as zeros (checked against Pd 0.54).
+        for taker in ["table tt 3", "text define t"] {
+            let entries = parse(&format!(
+                "#N canvas 0 22 450 300 12;\n\
+                 #X obj 10 10 array define -k a 3;\n\
+                 #X obj 10 40 {taker};\n\
+                 #A 0 1 2 3;\n"
+            ))
+            .unwrap()
+            .entries;
+            let b = bind_array_data(&entries);
+            assert!(!b.arrays[0].saved(), "{taker}");
+            assert_eq!(b.foreign, vec![(3, 2)], "{taker}");
+            assert!(b.unbound.is_empty(), "{taker}");
+        }
+    }
+
+    #[test]
+    fn a_text_define_keeps_its_own_saved_contents() {
+        let entries = parse(concat!(
+            "#N canvas 0 22 450 300 12;\n",
+            "#X obj 10 10 text define -k notes;\n",
+            "#A set 60 62 64 \\; 65 67 \\;;\n",
+        ))
+        .unwrap()
+        .entries;
+        assert!(array_data_warnings(&entries).is_empty());
     }
 }

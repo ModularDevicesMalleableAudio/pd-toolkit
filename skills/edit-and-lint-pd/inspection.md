@@ -129,8 +129,10 @@ pdtk array-data src/ scale_table --json        # {file, name, size, data:{…}}
 
 Behaviour worth knowing:
 
-- `#A` records bind to the most recently declared array, and one array's
+- `#A` records bind to the most recently created array (or `[table]` /
+  `[text define]` / `[scalar define]`, which take them too), and one array's
   data may span several records, each starting at its own onset.
+- `[array define name]` with no size is a 100-element array, as in PD.
 - Only `-k` arrays (or classic `float K` with bit 0 set) save contents;
   for anything else the command errors rather than printing an empty
   table, since PD loads those as zeros.

@@ -155,9 +155,17 @@ These are the rules that **must** be followed when creating or modifying `.pd` f
 it is the only place a patch stores table data, so reading it is what lets a
 patch array be the source of truth for a table duplicated in code.
 
-- **A record binds to the most recently *declared* array** (`#X array` or an
-  `array define`/`array d` object), exactly as Pd's loader does — not to the
-  nearest declaration structurally, and not scoped to a canvas.
+- **A record binds to the most recently created `#A` taker**, exactly as Pd's
+  loader does — not to the nearest declaration structurally, and not scoped
+  to a canvas. Takers are `#X array`, `[array define]` (with or without `-k`),
+  `[table]`, `[text define]` and `[scalar define]`, plus the bare
+  `[array]`/`[text]`/`[scalar]` shorthands (`model::takes_array_data`). A
+  `[table]` or `[text define]` between an array and its `#A` steals the data;
+  a `text define -k` saves its own contents as `#A set …`.
+- **`array define` name and size are both optional.** Pd reads leading
+  flags, then a name, then a size, and ignores anything after; a missing size
+  (or one below 1) is 100. An unknown flag switches pdtk to right-anchored
+  name/size, because its arity cannot be guessed.
 - **The first number after `#A` is an onset, not a value.** Pd writes long
   arrays as several records, each starting at the index of its first value.
   Treating the onset as element 0 shifts the whole table by one — the exact
@@ -169,13 +177,21 @@ patch array be the source of truth for a table duplicated in code.
 
 The binding rule was verified empirically against Pd 0.54: two declarations
 followed by two `#A` records load as "first array all zeros, second array holds
-the last record". `validate` warns about that shape (`misbound_array_data`),
-because a file written that way silently loses every array's data but one.
+the last record". `validate` warns about that shape, about records nothing
+takes, and about value records a non-array taker steals
+(`analysis::array_data::array_data_warnings`), because a file written that way
+silently loses array data.
 
 `model::parse_array_decl` is the single decoder for "what array does this entry
 declare" (used by both the `arrays` command's row builder and the data
-binding); `analysis::array_data::array_contents` applies the rules above.
-Don't add a second declaration parser.
+binding); `analysis::array_data::bind_array_data` applies the rules above.
+Don't add a second declaration parser or a second binding model.
+
+### Structural checks (`validate` / `lint`)
+
+`analysis::check::check_patch` is the one implementation of the structural
+checks. `validate` reports its findings; `lint` runs it and adds style checks.
+Add a new structural check there, never to one command only.
 
 ### Templates before the root canvas (`#N struct`)
 

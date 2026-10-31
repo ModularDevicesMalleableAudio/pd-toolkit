@@ -1,6 +1,5 @@
 use crate::commands::arrays::{
     ArraysConfig, KindFilter, Row, Schema, TemplateFilter, collect_rows, data_to_json,
-    format_number,
 };
 use crate::errors::PdtkError;
 use serde_json::json;
@@ -60,7 +59,8 @@ pub fn run(target: &str, name: &str, cfg: ArrayDataConfig) -> Result<String, Pdt
     if !data.saved() {
         return Err(PdtkError::Usage(format!(
             "array `{name}` in {} saves no contents \
-             (declared without -k / with an even save flag), \
+             (declared without -k / with an even save flag, or its #A records \
+             go to another object — see `pdtk validate`), \
              so PD loads it as {} zeros",
             row.file, row.size
         )));
@@ -89,7 +89,7 @@ pub fn run(target: &str, name: &str, cfg: ArrayDataConfig) -> Result<String, Pdt
     }
     let mut out = String::new();
     for (i, v) in data.values.iter().enumerate() {
-        let _ = writeln!(out, "{i} {}", format_number(*v));
+        let _ = writeln!(out, "{i} {v}");
     }
     Ok(out.trim_end().to_string())
 }

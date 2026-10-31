@@ -1,7 +1,6 @@
 use crate::errors::PdtkError;
 use pdtk::model::{Entry, EntryKind, Patch};
 use pdtk::parser::{TokenizeWarning, assign_depth_and_indices, tokenize_entries};
-use std::collections::HashMap;
 
 /// Check that `raw` is exactly one `;`-terminated entry before it is spliced
 /// into a patch.  An entry whose final `;` is escaped (`\;`) or missing would
@@ -23,146 +22,11 @@ pub fn ensure_single_entry(raw: &str) -> Result<(), PdtkError> {
     Ok(())
 }
 
-/// Detect entries that have absorbed a following record: a continuation line
-/// that starts with a `#X`/`#N`/`#A` sigil.  This is what a message whose
-/// final `;` is escaped looks like on disk — PD reads the next record as part
-/// of the message, so the object vanishes and later indices shift.  Returns
-/// human-readable messages (empty = no problems found).
-pub fn swallowed_records(patch: &Patch) -> Vec<String> {
-    let mut msgs = Vec::new();
-    for (i, e) in patch.entries.iter().enumerate() {
-        let swallowed = e.raw.lines().skip(1).find(|line| {
-            let line = line.trim_start();
-            ["#X ", "#N ", "#A "].iter().any(|s| line.starts_with(s))
-        });
-        if let Some(line) = swallowed {
-            msgs.push(format!(
-                "entry {i}: contains what looks like another record ({}) — the preceding \
-                 text probably ends in an escaped \\; with no terminating ';'",
-                line.trim()
-            ));
-        }
-    }
-    msgs
-}
-
-/// Whether an entry is an `array define` / `array d` object, which can carry
-/// `#A` saved data.
-pub(crate) fn is_array_define(entry: &Entry) -> bool {
-    entry.kind == EntryKind::Obj
-        && entry.class() == "array"
-        && matches!(
-            entry.args().first().map(String::as_str),
-            Some("define" | "d")
-        )
-}
-
-/// Detect `#A` array-data records that are not attached to an array
-/// definition. In PD's file format an `#A` record binds to the most recent
-/// array (`#X array` or `array define`); a record whose immediately preceding
-/// entry is neither an array definition nor another `#A` is orphaned, so its
-/// data will be lost or bound to the wrong array. Returns human-readable
-/// messages (empty = no problems found).
-pub fn detached_array_data(patch: &Patch) -> Vec<String> {
-    let mut msgs = Vec::new();
-    for (i, e) in patch.entries.iter().enumerate() {
-        if e.kind != EntryKind::ArrayData {
-            continue;
-        }
-        let attached = i.checked_sub(1).is_some_and(|p| {
-            let prev = &patch.entries[p];
-            matches!(prev.kind, EntryKind::ArrayData | EntryKind::Array) || is_array_define(prev)
-        });
-        if !attached {
-            msgs.push(format!(
-                "entry {i}: #A array data not attached to an array definition: {}",
-                e.raw.trim()
-            ));
-        }
-    }
-    msgs
-}
-
-/// Detect `#A` array data that PD will not load the way the file looks like it
-/// intends. Every `#A` record binds to the most recently *declared* array, so
-/// a block of records placed after a run of declarations lands entirely on the
-/// last one: each record overwrites the previous, the earlier arrays load as
-/// zeros, and values past the surviving array's size are discarded. Returns
-/// human-readable messages (empty = no problems found).
-pub fn misbound_array_data(patch: &Patch) -> Vec<String> {
-    let mut msgs = Vec::new();
-    for c in pdtk::analysis::array_data::array_contents(&patch.entries) {
-        let user_depth = c.depth.saturating_sub(1);
-        let name = &c.decl.name;
-        if c.overlapping_records > 0 {
-            msgs.push(format!(
-                "depth {user_depth}: {} of {} #A record(s) overwrite array '{name}' \
-                 (each starts before the previous ended) — #A binds to the most \
-                 recently declared array, so put each record directly after the \
-                 array it belongs to",
-                c.overlapping_records, c.records
-            ));
-        }
-        if c.overflow > 0 {
-            msgs.push(format!(
-                "depth {user_depth}: array '{name}' has size {} but its #A data supplies \
-                 {} more value(s), which PD discards",
-                c.decl.size, c.overflow
-            ));
-        }
-    }
-    msgs
-}
-
 /// Post-mutation validation: checks that all connection src/dst indices are
-/// in range for their own canvas.  Sibling subpatches at the same depth have
-/// independent index spaces, so counts are per `canvas_id`, not per depth.
-/// Returns a list of error strings (empty = valid).
+/// in range for their own canvas.  Returns a list of error strings (empty =
+/// valid).
 pub fn validate_patch(patch: &Patch) -> Vec<String> {
-    let mut errors = Vec::new();
-
-    let mut counts_by_canvas: HashMap<usize, usize> = HashMap::new();
-    for e in &patch.entries {
-        if e.object_index.is_some()
-            && let Some(cid) = e.canvas_id
-        {
-            *counts_by_canvas.entry(cid).or_insert(0) += 1;
-        }
-    }
-
-    for e in &patch.entries {
-        if e.kind != EntryKind::Connect {
-            continue;
-        }
-
-        let parts: Vec<&str> = e
-            .raw
-            .trim()
-            .trim_end_matches(';')
-            .split_whitespace()
-            .collect();
-        if parts.len() != 6 {
-            continue;
-        }
-
-        if let (Ok(src), Ok(dst)) = (parts[2].parse::<usize>(), parts[4].parse::<usize>()) {
-            let cid = e.canvas_id.unwrap_or(usize::MAX);
-            let count = counts_by_canvas.get(&cid).copied().unwrap_or(0);
-            let user_depth = e.depth.saturating_sub(1);
-            if src >= count {
-                errors.push(format!(
-                    "depth {user_depth}: connect src {src} out of range (object count {count})"
-                ));
-            }
-            if dst >= count {
-                errors.push(format!(
-                    "depth {user_depth}: connect dst {dst} out of range (object count {count})"
-                ));
-            }
-        }
-    }
-
-    errors
+    pdtk::analysis::check::connection_range_errors(patch)
 }
 
 /// Delete one object at `index` inside `canvas_id` from a raw entry list,

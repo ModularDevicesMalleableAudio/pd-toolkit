@@ -615,10 +615,57 @@ fn validate_does_not_warn_on_chunked_array_data() {
 
     let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
     assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        stdout_string(&out).trim(),
+        "OK: patch is valid",
+        "chunked data must not warn"
+    );
+}
+
+#[test]
+fn validate_does_not_warn_on_data_pd_saved_for_its_owner() {
+    // Each file loads exactly as written in Pd 0.54: an `array define`
+    // without a size (PD default 100) takes the records after it, and a
+    // `text define -k` saves its contents as `#A set …`.
+    let inputs = [
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 20 20 array define -k first 3;\n\
+         #A 0 1 2 3;\n\
+         #X obj 20 60 array define -k second;\n\
+         #A 0 7 8 9 10;\n",
+        "#N canvas 0 22 450 300 12;\n\
+         #X obj 20 20 text define -k notes;\n\
+         #A set 60 62 64 \\; 65 67 \\;;\n",
+    ];
+    for input in inputs {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), input).unwrap();
+        let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+        assert_eq!(
+            stdout_string(&out).trim(),
+            "OK: patch is valid",
+            "input:\n{input}"
+        );
+    }
+}
+
+#[test]
+fn validate_warns_when_array_data_follows_a_table() {
+    // `[table]` takes the `#A` records after it, so array `a` loads as zeros
+    // (checked against Pd 0.54).
+    let input = "#N canvas 0 22 450 300 12;\n\
+                 #X obj 20 20 array define -k a 3;\n\
+                 #X obj 20 60 table tt 3;\n\
+                 #A 0 1 2 3;\n";
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), input).unwrap();
+
+    let out = run_pdtk(&["validate", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
     let s = stdout_string(&out);
     assert!(
-        !s.contains("overwrite"),
-        "chunked data must not warn; got:\n{s}"
+        s.contains("entry 3: #A array data goes to [table tt 3] (entry 2)"),
+        "got:\n{s}"
     );
 }
 

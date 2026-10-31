@@ -1,11 +1,11 @@
 use crate::commands::common::{ensure_single_entry, validate_patch};
 use crate::errors::PdtkError;
 use crate::io;
-use crate::types::signatures::outlet_count;
 use pdtk::model::{EntryKind, content_without_width_hint, trailing_width_hint};
 use pdtk::parser::escape::{escape_pd_dollars, has_unescaped_semicolon};
 use pdtk::parser::parse;
 use pdtk::rewrite::serialize;
+use pdtk::types::signatures::outlet_count;
 
 #[allow(clippy::too_many_arguments)]
 pub fn run(
